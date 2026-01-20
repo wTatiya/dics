@@ -68,8 +68,26 @@
             </p>
           </div>
 
-          <div class="card">
-            <ol class="questionnaire">
+          <div class="card" id="interactive-quiz">
+            <h3>ทำแบบประเมินออนไลน์ (คำนวณผลอัตโนมัติ)</h3>
+            <p class="muted">
+              เลือกคำตอบในแต่ละข้อ แล้วกด “คำนวณผล” ระบบจะสรุปคะแนนและแปลผลให้ทันที
+              (คำตอบถูกเก็บไว้ในเครื่องของคุณเท่านั้น ผ่าน localStorage)
+            </p>
+
+            <div id="quiz-root" class="quiz-root" aria-live="polite"></div>
+
+            <noscript>
+              <p class="note">
+                เบราว์เซอร์ของคุณปิดใช้งาน JavaScript อยู่ จึงไม่สามารถคำนวณผลอัตโนมัติได้
+                คุณยังสามารถอ่านคำถามแบบรายการด้านล่างและคิดคะแนนตามคู่มือได้
+              </p>
+            </noscript>
+          </div>
+
+          <details class="card" id="question-bank">
+            <summary>ดูคำถามแบบรายการ (สำหรับพิมพ์/อ้างอิง)</summary>
+            <ol class="questionnaire" data-question-bank>
               <li>
                 เริ่มกะแล้วงานค้างเยอะ คุณมักจะ…
                 <ul>
@@ -287,7 +305,7 @@
                 </ul>
               </li>
             </ol>
-          </div>
+          </details>
         </div>
       </section>
 
@@ -454,5 +472,6 @@
         <p>คู่มือ DISC สำหรับพยาบาลไทย — พร้อมใช้ในเวิร์กช็อปและการพัฒนาบุคลากร</p>
       </div>
     </footer>
+    <script defer src="assets/app.js"></script>
   </body>
 </html>
