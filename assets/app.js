@@ -1,440 +1,505 @@
-// assets/app.js
-// Purpose: Turn the static DISC question list into an interactive questionnaire that auto-scores and interprets results.
-
+// /mnt/data/dics-main/assets/app.js
+// Purpose: Enhance the static DISC questionnaire into an interactive, auto-scoring notebook-style UI (GitHub Pages friendly).
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "dics_answers_v1";
+  /** @typedef {"A"|"B"|"C"|"D"} ChoiceLetter */
+  /** @typedef {"D"|"i"|"S"|"C"} DiscLetter */
 
-  const ANSWER_TO_STYLE = {
+  const CHOICE_TO_DISC = /** @type {const} */ ({
     A: "D",
     B: "i",
     C: "S",
     D: "C",
-  };
+  });
 
-  const STYLE_LABEL = {
-    D: "D (Dominance)",
-    i: "i (Influence)",
-    S: "S (Steadiness)",
-    C: "C (Conscientiousness)",
-  };
+  const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-  function $(selector, root = document) {
-    return root.querySelector(selector);
+  const STORAGE_KEY = "disc_quiz_v1_answers";
+
+  /**
+   * Extract question + options from the existing <ol class="questionnaire"> so the HTML remains the source of truth.
+   * @param {HTMLOListElement} ol
+   * @returns {{ question: string, options: Record<ChoiceLetter, string> }[]}
+   */
+  function parseQuestionnaire(ol) {
+    /** @type {{ question: string, options: Record<ChoiceLetter, string> }[]} */
+    const items = [];
+
+    const liNodes = Array.from(ol.querySelectorAll(":scope > li"));
+    for (const li of liNodes) {
+      // Clone so we can strip the <ul> without mutating the original fallback content.
+      const clone = /** @type {HTMLLIElement} */ (li.cloneNode(true));
+      const ul = clone.querySelector("ul");
+      if (!ul) continue;
+
+      ul.remove();
+      const questionText = (clone.textContent || "").replace(/\s+/g, " ").trim();
+
+      /** @type {Record<ChoiceLetter, string>} */
+      const options = /** @type {any} */ ({ A: "", B: "", C: "", D: "" });
+
+      const optionLis = Array.from(li.querySelectorAll("ul > li"));
+      for (const optLi of optionLis) {
+        const t = (optLi.textContent || "").replace(/\s+/g, " ").trim();
+        const m = t.match(/^([ABCD])\s*(.*)$/);
+        if (!m) continue;
+        /** @type {ChoiceLetter} */ const letter = /** @type {any} */ (m[1]);
+        options[letter] = (m[2] || "").trim();
+      }
+
+      // Validate we have 4 options.
+      if (options.A && options.B && options.C && options.D && questionText) {
+        items.push({ question: questionText, options });
+      }
+    }
+
+    return items;
   }
 
-  function $all(selector, root = document) {
-    return Array.from(root.querySelectorAll(selector));
+  /**
+   * Pull style blurbs from the existing #styles cards, keyed by D/i/S/C.
+   * @returns {Record<DiscLetter, string>}
+   */
+  function readStyleCards() {
+    /** @type {Record<DiscLetter, string>} */
+    const map = /** @type {any} */ ({ D: "", i: "", S: "", C: "" });
+    const styles = document.getElementById("styles");
+    if (!styles) return map;
+
+    const cards = Array.from(styles.querySelectorAll(".card"));
+    for (const card of cards) {
+      const h = card.querySelector("h3");
+      if (!h) continue;
+      const title = (h.textContent || "").trim();
+      const key = title.startsWith("D") ? "D" :
+                  title.startsWith("i") ? "i" :
+                  title.startsWith("S") ? "S" :
+                  title.startsWith("C") ? "C" : null;
+      if (!key) continue;
+      // Keep innerHTML so bold labels remain.
+      map[/** @type {DiscLetter} */ (key)] = card.innerHTML;
+    }
+    return map;
   }
 
-  function normalizeSpace(text) {
-    return String(text || "").replace(/\s+/g, " ").trim();
+  /**
+   * Pull Top-2 pair blurbs from #pairs list like "D/i:".
+   * @returns {Record<string, string>}
+   */
+  function readPairBlurbs() {
+    /** @type {Record<string, string>} */
+    const map = {};
+    const pairs = document.getElementById("pairs");
+    if (!pairs) return map;
+
+    const lis = Array.from(pairs.querySelectorAll("li"));
+    for (const li of lis) {
+      const strong = li.querySelector("strong");
+      if (!strong) continue;
+      const k = (strong.textContent || "").replace(":", "").trim(); // e.g. "D/i"
+      const full = li.innerHTML;
+      if (k) map[k] = full;
+    }
+    return map;
   }
 
-  function safeJsonParse(raw, fallback) {
+  /**
+   * @returns {Record<string, ChoiceLetter>}
+   */
+  function loadAnswers() {
     try {
-      return JSON.parse(raw);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== "object") return {};
+      return /** @type {any} */ (data);
     } catch {
-      return fallback;
+      return {};
     }
   }
 
-  function loadAnswers() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const data = safeJsonParse(raw, {});
-    return data && typeof data === "object" ? data : {};
-  }
-
-  function saveAnswers(answersByQid) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(answersByQid));
+  /**
+   * @param {Record<string, ChoiceLetter>} answers
+   */
+  function saveAnswers(answers) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+    } catch {
+      // Ignore storage failures (private mode, etc.)
+    }
   }
 
   function clearAnswers() {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  function extractPromptText(li) {
-    // Purpose: Read only the question prompt (exclude the answer list text).
-    const parts = [];
-    for (const node of Array.from(li.childNodes)) {
-      if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "UL") {
-        break;
-      }
-      if (node.nodeType === Node.TEXT_NODE) {
-        parts.push(node.textContent);
-      }
-      if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== "UL") {
-        parts.push(node.textContent);
-      }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
     }
-    return normalizeSpace(parts.join(" "));
   }
 
-  function readQuestionsFromBank(questionBankOl) {
-    // Purpose: Convert the existing <ol> in index.html into structured questions.
-    const questionLis = Array.from(questionBankOl.children).filter((el) => el.tagName === "LI");
-    return questionLis.map((li, idx) => {
-      const ul = li.querySelector("ul");
-      const optionLis = ul ? Array.from(ul.children).filter((el) => el.tagName === "LI") : [];
-      const options = {};
-
-      for (const optLi of optionLis) {
-        const txt = normalizeSpace(optLi.textContent);
-        const m = txt.match(/^([ABCD])\s+(.*)$/);
-        if (!m) continue;
-        options[m[1]] = m[2];
-      }
-
-      return {
-        id: String(idx + 1),
-        number: idx + 1,
-        prompt: extractPromptText(li),
-        options,
-      };
-    });
+  /**
+   * @param {number} score
+   * @returns {"ต่ำ"|"ปานกลาง"|"สูง"}
+   */
+  function intensity(score) {
+    if (score <= 5) return "ต่ำ";
+    if (score <= 9) return "ปานกลาง";
+    return "สูง";
   }
 
-  function computeScores(answersByQid) {
-    // Purpose: Count raw scores per DISC dimension.
-    const scores = { D: 0, i: 0, S: 0, C: 0 };
-    for (const answer of Object.values(answersByQid)) {
-      const style = ANSWER_TO_STYLE[answer];
-      if (style && Object.prototype.hasOwnProperty.call(scores, style)) {
-        scores[style] += 1;
-      }
-    }
-    return scores;
+  /**
+   * @param {Record<DiscLetter, number>} scores
+   * @returns {{top: DiscLetter[], top2: DiscLetter[]}}
+   */
+  function topStyles(scores) {
+    const entries = /** @type {[DiscLetter, number][]} */ (Object.entries(scores));
+    entries.sort((a, b) => b[1] - a[1]);
+
+    const max = entries[0]?.[1] ?? 0;
+    const top = entries.filter(([, v]) => v === max).map(([k]) => k);
+
+    const top2 = entries.slice(0, 2).map(([k]) => k);
+    return { top, top2 };
   }
 
-  function rankStyles(scores) {
-    // Purpose: Rank styles by score (desc). Keep deterministic order for ties.
-    const order = ["D", "i", "S", "C"];
-    return order
-      .map((k) => ({ key: k, value: scores[k] ?? 0 }))
-      .sort((a, b) => (b.value - a.value) || (order.indexOf(a.key) - order.indexOf(b.key)));
-  }
-
-  function getTopStyles(ranked) {
-    // Purpose: Support ties in the top score.
-    if (!ranked.length) return [];
-    const top = ranked[0].value;
-    return ranked.filter((r) => r.value === top).map((r) => r.key);
-  }
-
-  function buildPairLookup() {
-    // Purpose: Build lookup of Top-2 interpretation lines from existing HTML.
-    const map = new Map();
-    const strongs = $all("#styles ul li strong");
-    for (const strong of strongs) {
-      const key = normalizeSpace(strong.textContent).replace(/:$/, "");
-      const li = strong.closest("li");
-      if (!li) continue;
-
-      const full = normalizeSpace(li.textContent);
-      const rest = normalizeSpace(full.replace(key + ":", ""));
-      map.set(key, rest);
-    }
-    return map;
-  }
-
-  function buildStyleCardLookup() {
-    // Purpose: Map D/i/S/C to the corresponding explanation cards in the "styles" section.
-    const map = new Map();
-    const headings = $all("#styles .card h3");
-    for (const h3 of headings) {
-      const txt = normalizeSpace(h3.textContent);
-      const m = txt.match(/^([DiSC])\s/);
-      if (!m) continue;
-
-      const code = m[1] === "i" ? "i" : m[1];
-      const card = h3.closest(".card");
-      if (card) map.set(code, card);
-    }
-    return map;
-  }
-
-  function buildProgressEl(answered, total) {
+  /**
+   * @param {HTMLElement} root
+   * @param {number} total
+   * @returns {HTMLElement}
+   */
+  function buildProgressDots(root, total) {
     const wrap = document.createElement("div");
-    wrap.className = "quiz-progress";
+    wrap.className = "nbk-progress";
+    wrap.setAttribute("role", "navigation");
+    wrap.setAttribute("aria-label", "ความคืบหน้าแบบสอบถาม");
 
-    const label = document.createElement("span");
-    label.textContent = `ตอบแล้ว ${answered}/${total} ข้อ`;
+    for (let i = 0; i < total; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "nbk-dot";
+      btn.setAttribute("aria-label", `ไปข้อที่ ${i + 1}`);
+      btn.dataset.q = String(i + 1);
+      btn.addEventListener("click", () => {
+        const target = root.querySelector(`#nbk-q-${i + 1}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      wrap.appendChild(btn);
+    }
 
-    const progress = document.createElement("progress");
-    progress.max = total;
-    progress.value = answered;
-
-    wrap.append(label, progress);
     return wrap;
   }
 
-  function buildScoreGrid(scores, total) {
-    const grid = document.createElement("div");
-    grid.className = "score-grid";
+  /**
+   * @param {HTMLElement} root
+   * @param {number} questionCount
+   * @returns {HTMLElement}
+   */
+  function buildMonthTabs(root, questionCount) {
+    const nav = document.createElement("nav");
+    nav.className = "nbk-tabs";
+    nav.setAttribute("aria-label", "แถบเดือน (ลัดไปยังคำถาม)");
 
-    const order = ["D", "i", "S", "C"];
-    for (const k of order) {
-      const row = document.createElement("div");
-      row.className = "score-row";
+    // 12 tabs -> map each to 2 questions when questionCount=24 (fallback to proportional mapping).
+    for (let m = 0; m < 12; m++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "nbk-tab";
+      btn.textContent = MONTHS[m];
 
-      const label = document.createElement("strong");
-      label.textContent = k;
+      const qIndex = Math.min(
+        questionCount,
+        Math.max(1, Math.round(((m * questionCount) / 12) + 1))
+      );
 
-      const progress = document.createElement("progress");
-      progress.max = total;
-      progress.value = scores[k] ?? 0;
+      btn.setAttribute("aria-label", `ไปช่วงคำถาม (ประมาณข้อที่ ${qIndex})`);
+      btn.addEventListener("click", () => {
+        const target = root.querySelector(`#nbk-q-${qIndex}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
 
-      const value = document.createElement("span");
-      value.textContent = `${scores[k] ?? 0}/${total}`;
-
-      row.append(label, progress, value);
-      grid.append(row);
+      nav.appendChild(btn);
     }
 
-    return grid;
+    return nav;
   }
 
-  function buildQuiz(questionBankOl, quizRoot) {
-    const questions = readQuestionsFromBank(questionBankOl);
-    const total = questions.length;
+  /**
+   * @param {HTMLElement} resultsEl
+   * @param {Record<DiscLetter, number>} scores
+   * @param {Record<DiscLetter, string>} styleCards
+   * @param {Record<string, string>} pairBlurbs
+   * @param {boolean} complete
+   */
+  function renderResults(resultsEl, scores, styleCards, pairBlurbs, complete) {
+    const { top, top2 } = topStyles(scores);
 
-    if (total === 0) {
-      quizRoot.textContent = "ไม่พบรายการคำถามในหน้าเว็บ";
-      return;
-    }
+    const total = scores.D + scores.i + scores.S + scores.C;
+    const topLabel = top.length > 1 ? `Top (เสมอ): ${top.join(" / ")}` : `Top: ${top[0]}`;
+    const topIntensity = top.length === 1 ? `ความเด่นชัด: ${intensity(scores[top[0]])}` : "";
 
-    const pairLookup = buildPairLookup();
-    const styleCardLookup = buildStyleCardLookup();
+    const top2Key = top.length > 1 ? "" : `${top2[0]}/${top2[1]}`;
+    const top2KeyAlt = top.length > 1 ? "" : `${top2[1]}/${top2[0]}`;
+    const pairHtml = top2Key ? (pairBlurbs[top2Key] || pairBlurbs[top2KeyAlt] || "") : "";
 
-    const answersByQid = loadAnswers();
+    const styleHtml = top.length === 1 ? (styleCards[top[0]] || "") : "";
 
-    const form = document.createElement("form");
-    form.className = "quiz-form";
-    form.noValidate = true;
+    resultsEl.innerHTML = `
+      <div class="nbk-card">
+        <div class="nbk-card-head">
+          <h4>สรุปผล</h4>
+          <div class="nbk-status ${complete ? "is-complete" : ""}">
+            ${complete ? "ครบแล้ว" : "ตอบให้ครบ 24 ข้อ"}
+          </div>
+        </div>
 
-    function countAnswered() {
-      return Object.values(answersByQid).filter((v) => ["A", "B", "C", "D"].includes(v)).length;
-    }
+        <div class="nbk-scores" role="list" aria-label="คะแนนรายมิติ">
+          <div class="nbk-score" role="listitem"><span class="k">D</span><span class="v">${scores.D}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">i</span><span class="v">${scores.i}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">S</span><span class="v">${scores.S}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">C</span><span class="v">${scores.C}</span></div>
+        </div>
 
-    const ui = {
-      progress: buildProgressEl(countAnswered(), total),
-      result: document.createElement("div"),
-    };
-    ui.result.className = "quiz-result";
+        <div class="nbk-meta">
+          <div class="nbk-meta-line"><strong>${topLabel}</strong></div>
+          ${topIntensity ? `<div class="nbk-meta-line">${topIntensity}</div>` : ""}
+          ${top2Key && pairHtml ? `<div class="nbk-meta-line"><strong>Top 2:</strong> ${top2Key}</div>` : ""}
+        </div>
 
-    function updateProgress() {
-      const answered = countAnswered();
-      const newProgress = buildProgressEl(answered, total);
-      ui.progress.replaceWith(newProgress);
-      ui.progress = newProgress;
-      quizRoot.prepend(ui.progress);
-    }
+        ${styleHtml ? `<div class="nbk-explain"><div class="nbk-explain-title">คำอธิบายสไตล์</div>${styleHtml}</div>` : ""}
+        ${pairHtml ? `<div class="nbk-explain"><div class="nbk-explain-title">การแปลผลแบบคู่ (Top 2)</div><div>${pairHtml}</div></div>` : ""}
 
-    function setAnswer(qid, value) {
-      answersByQid[qid] = value;
-      saveAnswers(answersByQid);
-      updateProgress();
-    }
+        <div class="nbk-actions">
+          <button type="button" class="nbk-btn" data-action="copy">คัดลอกสรุป</button>
+          <button type="button" class="nbk-btn nbk-btn-ghost" data-action="reset">ล้างคำตอบ</button>
+        </div>
 
-    function validateAllAnswered() {
-      const missing = [];
-      for (const q of questions) {
-        if (!answersByQid[q.id]) missing.push(q.number);
+        <div class="nbk-note">
+          *ผลนี้ใช้เพื่อสะท้อนตนเองและการสื่อสารในทีม ไม่ใช่เครื่องมือเชิงคลินิก
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * @param {HTMLElement} quizMount
+   * @param {{ question: string, options: Record<ChoiceLetter, string> }[]} items
+   */
+  function buildQuizUI(quizMount, items) {
+    const styleCards = readStyleCards();
+    const pairBlurbs = readPairBlurbs();
+    const stored = loadAnswers();
+
+    /** @type {Record<string, ChoiceLetter>} */
+    const answers = { ...stored };
+
+    const sheet = document.createElement("div");
+    sheet.className = "nbk-sheet";
+    sheet.innerHTML = `
+      <div class="nbk-paper">
+        <header class="nbk-header">
+          <div class="nbk-title">
+            <div class="nbk-badge">DISC</div>
+            <div>
+              <div class="nbk-title-main">แบบสอบถาม 24 ข้อ</div>
+              <div class="nbk-title-sub">เลือก 1 ตัวเลือกต่อข้อ • ระบบจะคำนวณอัตโนมัติ</div>
+            </div>
+          </div>
+        </header>
+
+        <div class="nbk-layout">
+          <form class="nbk-form" autocomplete="off">
+            <div class="nbk-grid" id="nbk-grid"></div>
+          </form>
+
+          <aside class="nbk-aside" aria-label="ผลคะแนน DISC">
+            <div id="nbk-results"></div>
+          </aside>
+        </div>
+      </div>
+    `;
+
+    quizMount.appendChild(sheet);
+
+    const header = sheet.querySelector(".nbk-header");
+    const grid = /** @type {HTMLElement} */ (sheet.querySelector("#nbk-grid"));
+    const resultsEl = /** @type {HTMLElement} */ (sheet.querySelector("#nbk-results"));
+
+    const progress = buildProgressDots(sheet, items.length);
+    header?.appendChild(progress);
+
+    // Month tabs rail (UI accent + jump)
+    sheet.appendChild(buildMonthTabs(sheet, items.length));
+
+    for (let i = 0; i < items.length; i++) {
+      const qNum = i + 1;
+      const item = items[i];
+
+      const fs = document.createElement("fieldset");
+      fs.className = "nbk-q";
+      fs.id = `nbk-q-${qNum}`;
+      fs.innerHTML = `
+        <legend>
+          <span class="nbk-qno">${qNum}</span>
+          <span class="nbk-qtext">${escapeHtml(item.question)}</span>
+        </legend>
+        <div class="nbk-opts">
+          ${(["A","B","C","D"]).map((letter) => {
+            const l = /** @type {ChoiceLetter} */ (letter);
+            const val = escapeHtml(item.options[l]);
+            const id = `nbk-q${qNum}-${l}`;
+            return `
+              <label class="nbk-opt" for="${id}">
+                <input id="${id}" type="radio" name="q${qNum}" value="${l}" />
+                <span class="nbk-opt-letter">${l}</span>
+                <span class="nbk-opt-text">${val}</span>
+              </label>
+            `;
+          }).join("")}
+        </div>
+      `;
+      grid.appendChild(fs);
+
+      // Restore choice
+      const storedChoice = answers[`q${qNum}`];
+      if (storedChoice) {
+        const input = fs.querySelector(`input[value="${storedChoice}"]`);
+        if (input) /** @type {HTMLInputElement} */ (input).checked = true;
       }
-      return missing;
+
+      fs.addEventListener("change", (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.name !== `q${qNum}`) return;
+
+        /** @type {ChoiceLetter} */ const choice = /** @type {any} */ (t.value);
+        answers[`q${qNum}`] = choice;
+        saveAnswers(answers);
+        update();
+      });
     }
 
-    function renderResult() {
-      ui.result.replaceChildren();
-
-      const missing = validateAllAnswered();
-      if (missing.length) {
-        const note = document.createElement("p");
-        note.className = "note";
-        note.textContent = `ยังตอบไม่ครบ: ข้อ ${missing.join(", ")} (กรุณาตอบให้ครบ 24 ข้อก่อนคำนวณผล)`;
-        ui.result.append(note);
-        return;
+    function calcScores() {
+      /** @type {Record<DiscLetter, number>} */
+      const scores = { D: 0, i: 0, S: 0, C: 0 };
+      for (let q = 1; q <= items.length; q++) {
+        const choice = answers[`q${q}`];
+        if (!choice) continue;
+        const disc = CHOICE_TO_DISC[choice];
+        scores[disc] += 1;
       }
+      return scores;
+    }
 
-      const scores = computeScores(answersByQid);
-      const ranked = rankStyles(scores);
-      const topStyles = getTopStyles(ranked);
+    function isComplete() {
+      for (let q = 1; q <= items.length; q++) {
+        if (!answers[`q${q}`]) return false;
+      }
+      return true;
+    }
 
-      const resultWrap = document.createElement("div");
-      resultWrap.className = "card quiz-result";
+    function updateDots() {
+      const dots = Array.from(sheet.querySelectorAll(".nbk-dot"));
+      for (const dot of dots) {
+        const q = Number(dot.getAttribute("data-q") || "0");
+        const filled = !!answers[`q${q}`];
+        dot.classList.toggle("is-filled", filled);
+      }
+    }
 
-      const h = document.createElement("h3");
-      h.textContent = "สรุปผลแบบประเมิน (คำนวณอัตโนมัติ)";
+    function update() {
+      const scores = calcScores();
+      renderResults(resultsEl, scores, styleCards, pairBlurbs, isComplete());
+      updateDots();
+    }
 
-      const summary = document.createElement("p");
-      const topText = topStyles.length > 1 ? topStyles.join(", ") : topStyles[0];
-      summary.innerHTML = `<strong>คะแนน:</strong> D ${scores.D} / i ${scores.i} / S ${scores.S} / C ${scores.C}<br /><strong>สไตล์เด่น:</strong> ${topText}`;
+    // Actions (copy/reset)
+    quizMount.addEventListener("click", async (ev) => {
+      const t = ev.target;
+      if (!(t instanceof HTMLElement)) return;
+      const btn = t.closest("[data-action]");
+      if (!btn) return;
 
-      resultWrap.append(h, summary);
-
-      resultWrap.append(buildScoreGrid(scores, total));
-
-      // Top-2 interpretation (if no tie for #1)
-      const pairBlock = document.createElement("p");
-      const top1 = ranked[0]?.key;
-      const top2 = ranked[1]?.key;
-
-      if (topStyles.length === 1 && top1 && top2) {
-        const key = `${top1}/${top2}`;
-        const desc = pairLookup.get(key);
-        if (desc) {
-          pairBlock.innerHTML = `<strong>Top 2:</strong> ${key} — ${desc}`;
-        } else {
-          pairBlock.innerHTML = `<strong>Top 2:</strong> ${key}`;
+      const action = btn.getAttribute("data-action");
+      if (action === "reset") {
+        for (let q = 1; q <= items.length; q++) delete answers[`q${q}`];
+        clearAnswers();
+        // Clear UI checks
+        for (const input of Array.from(sheet.querySelectorAll("input[type=radio]"))) {
+          /** @type {HTMLInputElement} */ (input).checked = false;
         }
-      } else {
-        pairBlock.innerHTML = `<strong>Top 2:</strong> มีคะแนนสูงสุดเท่ากัน (${topText}) แนะนำดูการตีความรายมิติด้านล่าง`;
+        update();
       }
 
-      resultWrap.append(pairBlock);
+      if (action === "copy") {
+        const scores = calcScores();
+        const { top, top2 } = topStyles(scores);
+        const topLabel = top.length > 1 ? `Top (tie): ${top.join("/")}` : `Top: ${top[0]} (${intensity(scores[top[0]])})`;
+        const top2Key = top.length > 1 ? "" : `${top2[0]}/${top2[1]}`;
+        const text =
+          `DISC (24 ข้อ)\n` +
+          `D=${scores.D}, i=${scores.i}, S=${scores.S}, C=${scores.C}\n` +
+          `${topLabel}\n` +
+          (top2Key ? `Top2: ${top2Key}\n` : "");
 
-      // Interpretation cards (clone from the static section)
-      const interpTitle = document.createElement("p");
-      interpTitle.innerHTML = "<strong>คำอธิบายรายมิติ:</strong>";
-      resultWrap.append(interpTitle);
-
-      for (const style of topStyles) {
-        const card = styleCardLookup.get(style);
-        if (card) {
-          const clone = card.cloneNode(true);
-          // Avoid nested heading levels jumping: keep as-is, but make it visually consistent
-          resultWrap.append(clone);
-        } else {
-          const p = document.createElement("p");
-          p.textContent = `${STYLE_LABEL[style] ?? style}`;
-          resultWrap.append(p);
-        }
-      }
-
-      // Actions
-      const actions = document.createElement("div");
-      actions.className = "quiz-controls";
-
-      const copyBtn = document.createElement("button");
-      copyBtn.type = "button";
-      copyBtn.className = "button button-outline";
-      copyBtn.textContent = "คัดลอกสรุปผล";
-
-      copyBtn.addEventListener("click", async () => {
-        const lines = [
-          "ผลแบบประเมิน DISC (24 ข้อ)",
-          `คะแนน: D ${scores.D} / i ${scores.i} / S ${scores.S} / C ${scores.C}`,
-          `สไตล์เด่น: ${topText}`,
-        ];
-        const text = lines.join("\n");
         try {
           await navigator.clipboard.writeText(text);
-          copyBtn.textContent = "คัดลอกแล้ว ✓";
-          setTimeout(() => (copyBtn.textContent = "คัดลอกสรุปผล"), 1200);
+          flashStatus(resultsEl, "คัดลอกแล้ว");
         } catch {
-          // Fallback: select the summary text for manual copy
-          const tmp = document.createElement("textarea");
-          tmp.value = text;
-          tmp.style.position = "fixed";
-          tmp.style.left = "-10000px";
-          document.body.appendChild(tmp);
-          tmp.select();
-          document.execCommand("copy");
-          document.body.removeChild(tmp);
-          copyBtn.textContent = "คัดลอกแล้ว ✓";
-          setTimeout(() => (copyBtn.textContent = "คัดลอกสรุปผล"), 1200);
+          // Fallback: prompt
+          window.prompt("คัดลอกข้อความนี้:", text);
         }
-      });
-
-      const resetBtn = document.createElement("button");
-      resetBtn.type = "button";
-      resetBtn.className = "button button-outline";
-      resetBtn.textContent = "ล้างคำตอบ";
-
-      resetBtn.addEventListener("click", () => {
-        clearAnswers();
-        for (const q of questions) delete answersByQid[q.id];
-        // Uncheck radios
-        for (const input of $all('input[type="radio"][name^="q_"]', form)) {
-          input.checked = false;
-        }
-        updateProgress();
-        ui.result.replaceChildren();
-      });
-
-      actions.append(copyBtn, resetBtn);
-      resultWrap.append(actions);
-
-      ui.result.append(resultWrap);
-    }
-
-    for (const q of questions) {
-      const fs = document.createElement("fieldset");
-      fs.dataset.qid = q.id;
-
-      const legend = document.createElement("legend");
-      legend.textContent = `${q.number}. ${q.prompt}`;
-
-      const optionsWrap = document.createElement("div");
-      optionsWrap.className = "quiz-options";
-
-      for (const letter of ["A", "B", "C", "D"]) {
-        const label = document.createElement("label");
-        label.className = "quiz-option";
-
-        const input = document.createElement("input");
-        input.type = "radio";
-        input.name = `q_${q.id}`;
-        input.value = letter;
-
-        if (answersByQid[q.id] === letter) input.checked = true;
-
-        input.addEventListener("change", () => setAnswer(q.id, letter));
-
-        const span = document.createElement("span");
-        span.innerHTML = `<strong>${letter}</strong> ${q.options[letter] ?? ""}`;
-
-        label.append(input, span);
-        optionsWrap.append(label);
       }
-
-      fs.append(legend, optionsWrap);
-      form.append(fs);
-    }
-
-    const controls = document.createElement("div");
-    controls.className = "quiz-controls";
-
-    const calcBtn = document.createElement("button");
-    calcBtn.type = "submit";
-    calcBtn.className = "button";
-    calcBtn.textContent = "คำนวณผล";
-
-    controls.append(calcBtn);
-
-    form.append(controls);
-
-    form.addEventListener("submit", (ev) => {
-      ev.preventDefault();
-      renderResult();
-      ui.result.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
-    quizRoot.append(ui.progress, form, ui.result);
+    update();
+  }
 
-    // Initial result render (only if answers complete)
-    updateProgress();
-    if (countAnswered() === total) renderResult();
+  /**
+   * Escape HTML to prevent injection when using innerHTML templating.
+   * @param {string} s
+   * @returns {string}
+   */
+  function escapeHtml(s) {
+    return s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  /**
+   * @param {HTMLElement} resultsEl
+   * @param {string} msg
+   */
+  function flashStatus(resultsEl, msg) {
+    const badge = document.createElement("div");
+    badge.className = "nbk-toast";
+    badge.textContent = msg;
+    resultsEl.appendChild(badge);
+    setTimeout(() => badge.remove(), 1200);
   }
 
   function init() {
-    const quizRoot = $("#quiz-root");
-    const questionBankOl = $('[data-question-bank]');
+    document.documentElement.classList.add("js");
 
-    if (!quizRoot || !questionBankOl) return;
+    const mount = document.getElementById("disc-quiz");
+    if (!mount) return;
 
-    buildQuiz(questionBankOl, quizRoot);
+    const ol = document.querySelector("#survey .questionnaire");
+    if (!(ol instanceof HTMLOListElement)) {
+      mount.innerHTML = `<div class="card"><p>ไม่พบรายการคำถาม (questionnaire) ในหน้าเว็บ</p></div>`;
+      return;
+    }
+
+    const items = parseQuestionnaire(ol);
+    if (!items.length) {
+      mount.innerHTML = `<div class="card"><p>อ่านคำถามไม่สำเร็จ โปรดตรวจรูปแบบ HTML ของแบบสอบถาม</p></div>`;
+      return;
+    }
+
+    buildQuizUI(mount, items);
   }
 
   if (document.readyState === "loading") {
