@@ -14,3 +14,8 @@ def test_site_assets_exist():
     assert css_path.exists()
     assert "lang=\"th\"" in index_path.read_text(encoding="utf-8")
     assert "Google Sans" in css_path.read_text(encoding="utf-8")
+
+def test_js_exists():
+    root = Path(__file__).resolve().parents[1]
+    js_path = root / "assets" / "app.js"
+    assert js_path.exists()
