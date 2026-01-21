@@ -377,8 +377,8 @@ thead {
 /* Layout */
 .disc-quiz .nbk-layout {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 1rem;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
   padding-left: 3.9rem;
   padding-right: 0.5rem;
 }
@@ -492,17 +492,9 @@ thead {
   color: white;
 }
 
-/* Aside (results) */
-.disc-quiz .nbk-aside {
-  position: sticky;
-  top: 1rem;
-  align-self: start;
-}
-
-@media (max-width: 920px) {
-  .disc-quiz .nbk-aside {
-    position: static;
-  }
+/* Results (placed after questions) */
+.disc-quiz .nbk-results {
+  margin-bottom: 1.5rem;
 }
 
 .disc-quiz .nbk-card {
