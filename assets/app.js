@@ -312,9 +312,7 @@
             <div class="nbk-grid" id="nbk-grid"></div>
           </form>
 
-          <aside class="nbk-aside" aria-label="ผลคะแนน DISC">
-            <div id="nbk-results"></div>
-          </aside>
+          <div class="nbk-results" id="nbk-results" aria-label="ผลคะแนน DISC"></div>
         </div>
       </div>
     `;
