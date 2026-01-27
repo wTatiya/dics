@@ -410,6 +410,44 @@ thead {
   }
 }
 
+@media (max-width: 640px) {
+  .disc-quiz .nbk-paper {
+    padding: 0.9rem 0.85rem 1.05rem;
+  }
+
+  .disc-quiz .nbk-sheet::before {
+    left: 0.6rem;
+    width: 1.65rem;
+    opacity: 0.55;
+  }
+
+  .disc-quiz .nbk-sheet::after {
+    left: 2.1rem;
+  }
+
+  .disc-quiz .nbk-header,
+  .disc-quiz .nbk-layout {
+    padding-left: 2.35rem;
+  }
+
+  .disc-quiz .nbk-title {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .disc-quiz .nbk-badge {
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .disc-quiz .nbk-progress {
+    grid-template-columns: repeat(8, 10px);
+    gap: 5px;
+  }
+}
+
 .disc-quiz .nbk-q {
   border: 1px solid rgba(17, 24, 39, 0.08);
   border-radius: 1rem;
