@@ -389,6 +389,16 @@ thead {
 @media (max-width: 640px) {
   .disc-quiz .nbk-paper {
     padding: 0.9rem 0.85rem 1.05rem;
+    /* Keep phone view clean: remove notebook background ornaments. */
+    background: #ffffff;
+  }
+
+  .disc-quiz .nbk-paper::before,
+  .disc-quiz .nbk-paper::after,
+  .disc-quiz .nbk-sheet::before,
+  .disc-quiz .nbk-sheet::after {
+    content: none !important;
+    display: none !important;
   }
 
   .disc-quiz .nbk-header,
