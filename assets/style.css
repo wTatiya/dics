@@ -276,31 +276,7 @@ thead {
     );
 }
 
-/* Left margin line + punch holes */
-.disc-quiz .nbk-sheet::before {
-  content: "";
-  position: absolute;
-  left: 1.15rem;
-  top: 1.25rem;
-  bottom: 1.25rem;
-  width: 2.35rem;
-  pointer-events: none;
-  background:
-    /* punch holes */
-    radial-gradient(circle at 50% 14px, rgba(17, 24, 39, 0.14) 0 7px, transparent 8px) 0 0 / 100% 44px repeat-y;
-  opacity: 0.7;
-}
-
-.disc-quiz .nbk-sheet::after {
-  content: "";
-  position: absolute;
-  left: 3.6rem;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: rgba(239, 68, 68, 0.25);
-  pointer-events: none;
-}
+/* Removed notebook left margin decorations (punch holes + red rule line). */
 
 /* Header */
 .disc-quiz .nbk-header {
@@ -308,7 +284,7 @@ thead {
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  padding-left: 3.9rem;
+  padding-left: 0.5rem;
   padding-right: 0.5rem;
   padding-top: 0.25rem;
   padding-bottom: 0.75rem;
@@ -379,7 +355,7 @@ thead {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.25rem;
-  padding-left: 3.9rem;
+  padding-left: 0.5rem;
   padding-right: 0.5rem;
 }
 
@@ -415,19 +391,9 @@ thead {
     padding: 0.9rem 0.85rem 1.05rem;
   }
 
-  .disc-quiz .nbk-sheet::before {
-    left: 0.6rem;
-    width: 1.65rem;
-    opacity: 0.55;
-  }
-
-  .disc-quiz .nbk-sheet::after {
-    left: 2.1rem;
-  }
-
   .disc-quiz .nbk-header,
   .disc-quiz .nbk-layout {
-    padding-left: 2.35rem;
+    padding-left: 0.35rem;
   }
 
   .disc-quiz .nbk-title {
@@ -679,4 +645,3 @@ thead {
   font-weight: 800;
   color: rgba(22, 101, 52, 0.92);
 }
-
