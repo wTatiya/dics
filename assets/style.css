@@ -645,6 +645,18 @@ thead {
   background: rgba(59, 130, 246, 0.18);
 }
 
+.disc-quiz .nbk-btn-send {
+  border-color: rgba(22, 163, 74, 0.42);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.32);
+}
+
+.disc-quiz .nbk-btn-send:hover {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 1), rgba(21, 128, 61, 1));
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.38);
+}
+
 .disc-quiz .nbk-btn-ghost {
   border-color: rgba(17, 24, 39, 0.16);
   background: rgba(17, 24, 39, 0.03);
@@ -668,38 +680,3 @@ thead {
   color: rgba(22, 101, 52, 0.92);
 }
 
-/* Right-edge month tabs rail (UI accent like the reference) */
-.disc-quiz .nbk-tabs {
-  position: absolute;
-  right: -3.2rem;
-  top: 5.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.25rem;
-}
-
-.disc-quiz .nbk-tab {
-  width: 3.1rem;
-  height: 1.75rem;
-  border-radius: 0.85rem;
-  border: 1px solid rgba(17, 24, 39, 0.10);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.08);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  color: rgba(17, 24, 39, 0.72);
-  cursor: pointer;
-}
-
-.disc-quiz .nbk-tab:hover {
-  border-color: rgba(59, 130, 246, 0.35);
-  color: rgba(31, 79, 214, 0.95);
-}
-
-@media (max-width: 920px) {
-  .disc-quiz .nbk-tabs {
-    display: none;
-  }
-}

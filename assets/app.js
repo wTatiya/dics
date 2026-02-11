@@ -13,8 +13,6 @@
     D: "C",
   });
 
-  const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-
   const STORAGE_KEY = "disc_quiz_v1_answers";
 
   /**
@@ -191,40 +189,6 @@
   }
 
   /**
-   * @param {HTMLElement} root
-   * @param {number} questionCount
-   * @returns {HTMLElement}
-   */
-  function buildMonthTabs(root, questionCount) {
-    const nav = document.createElement("nav");
-    nav.className = "nbk-tabs";
-    nav.setAttribute("aria-label", "แถบเดือน (ลัดไปยังคำถาม)");
-
-    // 12 tabs -> map each to 2 questions when questionCount=24 (fallback to proportional mapping).
-    for (let m = 0; m < 12; m++) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "nbk-tab";
-      btn.textContent = MONTHS[m];
-
-      const qIndex = Math.min(
-        questionCount,
-        Math.max(1, Math.round(((m * questionCount) / 12) + 1))
-      );
-
-      btn.setAttribute("aria-label", `ไปช่วงคำถาม (ประมาณข้อที่ ${qIndex})`);
-      btn.addEventListener("click", () => {
-        const target = root.querySelector(`#nbk-q-${qIndex}`);
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-
-      nav.appendChild(btn);
-    }
-
-    return nav;
-  }
-
-  /**
    * @param {HTMLElement} resultsEl
    * @param {Record<DiscLetter, number>} scores
    * @param {Record<DiscLetter, string>} styleCards
@@ -270,6 +234,7 @@
         ${pairHtml ? `<div class="nbk-explain"><div class="nbk-explain-title">การแปลผลแบบคู่ (Top 2)</div><div>${pairHtml}</div></div>` : ""}
 
         <div class="nbk-actions">
+          <button type="button" class="nbk-btn nbk-btn-send" data-action="send">ส่งผล</button>
           <button type="button" class="nbk-btn" data-action="copy">คัดลอกสรุป</button>
           <button type="button" class="nbk-btn nbk-btn-ghost" data-action="reset">ล้างคำตอบ</button>
         </div>
@@ -325,9 +290,6 @@
 
     const progress = buildProgressDots(sheet, items.length);
     header?.appendChild(progress);
-
-    // Month tabs rail (UI accent + jump)
-    sheet.appendChild(buildMonthTabs(sheet, items.length));
 
     for (let i = 0; i < items.length; i++) {
       const qNum = i + 1;
@@ -411,7 +373,7 @@
       updateDots();
     }
 
-    // Actions (copy/reset)
+    // Actions (send/copy/reset)
     quizMount.addEventListener("click", async (ev) => {
       const t = ev.target;
       if (!(t instanceof HTMLElement)) return;
@@ -447,6 +409,10 @@
           // Fallback: prompt
           window.prompt("คัดลอกข้อความนี้:", text);
         }
+      }
+
+      if (action === "send") {
+        window.open("https://www.menti.com/alozdhwzj9id?source=qr-page", "_blank", "noopener,noreferrer");
       }
     });
 
