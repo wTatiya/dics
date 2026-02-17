@@ -13,6 +13,56 @@
     D: "C",
   });
 
+  const QUESTION_SCORING = /** @type {const} */ ([
+    { A: "C", B: "i", C: "D", D: "S" },
+    { A: "C", B: "S", C: "D", D: "i" },
+    { A: "S", B: "C", C: "D", D: "i" },
+    { A: "i", B: "C", C: "D", D: "S" },
+    { A: "i", B: "D", C: "C", D: "S" },
+    { A: "S", B: "C", C: "D", D: "i" },
+    { A: "i", B: "C", C: "D", D: "S" },
+    { A: "C", B: "i", C: "D", D: "S" },
+    { A: "i", B: "S", C: "D", D: "C" },
+    { A: "C", B: "S", C: "D", D: "i" },
+    { A: "S", B: "C", C: "i", D: "D" },
+    { A: "C", B: "S", C: "D", D: "i" },
+    { A: "S", B: "C", C: "i", D: "D" },
+    { A: "C", B: "i", C: "S", D: "D" },
+    { A: "S", B: "C", C: "D", D: "i" },
+    { A: "S", B: "C", C: "i", D: "D" },
+    { A: "C", B: "S", C: "D", D: "i" },
+    { A: "C", B: "D", C: "i", D: "S" },
+    { A: "C", B: "S", C: "i", D: "D" },
+    { A: "C", B: "S", C: "i", D: "D" },
+    { A: "i", B: "D", C: "C", D: "S" },
+    { A: "S", B: "C", C: "i", D: "D" },
+    { A: "C", B: "S", C: "i", D: "D" },
+    { A: "C", B: "S", C: "i", D: "D" },
+  ]);
+
+  const CHOICE_PROFILE_MAP = /** @type {const} */ ({
+    A: {
+      emoji: "🐂",
+      title: 'คุณคือ "กระทิง" (The Bull) - D Style',
+      subtitle: "(ผู้นำจอมพลัง ผู้มุ่งมั่นพิชิตเป้าหมาย / Dominance)",
+    },
+    B: {
+      emoji: "🦅",
+      title: 'คุณคือ "อินทรี" (The Eagle) - I Style',
+      subtitle: "(นักวิสัยทัศน์ ผู้สร้างแรงบันดาลใจ / Influence)",
+    },
+    C: {
+      emoji: "🐭",
+      title: 'คุณคือ "หนู" (The Mouse) - S Style',
+      subtitle: "(ผู้ประสานใจ ผู้ดูแลด้วยความห่วงใย / Steadiness)",
+    },
+    D: {
+      emoji: "🧸",
+      title: 'คุณคือ "หมี" (The Bear) - C Style',
+      subtitle: "(นักวิเคราะห์ ผู้รักษากฎระเบียบ / Conscientiousness)",
+    },
+  });
+
   const STORAGE_KEY = "disc_quiz_v1_answers";
 
   const DISC_PROFILE_MAP = /** @type {const} */ ({
@@ -205,24 +255,44 @@
   }
 
   /**
+   * @param {Record<string, ChoiceLetter>} answers
+   * @param {number} total
+   * @returns {Record<ChoiceLetter, number>}
+   */
+  function calcChoiceCounts(answers, total) {
+    const counts = /** @type {Record<ChoiceLetter, number>} */ ({ A: 0, B: 0, C: 0, D: 0 });
+    for (let q = 1; q <= total; q++) {
+      const choice = answers[`q${q}`];
+      if (!choice) continue;
+      counts[choice] += 1;
+    }
+    return counts;
+  }
+
+  /**
+   * @param {Record<ChoiceLetter, number>} counts
+   * @returns {ChoiceLetter[]}
+   */
+  function topChoiceLetters(counts) {
+    const entries = /** @type {[ChoiceLetter, number][]} */ (Object.entries(counts));
+    entries.sort((a, b) => b[1] - a[1]);
+    const max = entries[0]?.[1] ?? 0;
+    return entries.filter(([, v]) => v === max).map(([k]) => k);
+  }
+
+  /**
    * @param {HTMLElement} resultsEl
    * @param {Record<DiscLetter, number>} scores
-   * @param {Record<DiscLetter, string>} styleCards
-   * @param {Record<string, string>} pairBlurbs
+   * @param {Record<ChoiceLetter, number>} choiceCounts
    * @param {boolean} complete
    */
-  function renderResults(resultsEl, scores, styleCards, pairBlurbs, complete) {
-    const { top, top2 } = topStyles(scores);
-
-    const total = scores.D + scores.i + scores.S + scores.C;
-    const topLabel = top.length > 1 ? `Top (เสมอ): ${top.map(formatDiscLabel).join(" / ")}` : `Top: ${formatDiscLabel(top[0])}`;
-    const topIntensity = top.length === 1 ? `ความเด่นชัด: ${intensity(scores[top[0]])}` : "";
-
-    const top2Key = top.length > 1 ? "" : `${top2[0]}/${top2[1]}`;
-    const top2KeyAlt = top.length > 1 ? "" : `${top2[1]}/${top2[0]}`;
-    const pairHtml = top2Key ? (pairBlurbs[top2Key] || pairBlurbs[top2KeyAlt] || "") : "";
-
-    const styleHtml = top.length === 1 ? (styleCards[top[0]] || "") : "";
+  function renderResults(resultsEl, scores, choiceCounts, complete) {
+    const topLetters = topChoiceLetters(choiceCounts);
+    const choiceTotal = choiceCounts.A + choiceCounts.B + choiceCounts.C + choiceCounts.D;
+    const topLabel = topLetters.length === 1
+      ? `${CHOICE_PROFILE_MAP[topLetters[0]].emoji} ${CHOICE_PROFILE_MAP[topLetters[0]].title}`
+      : `ผลเสมอ: ${topLetters.map((l) => `${CHOICE_PROFILE_MAP[l].emoji} ${l}`).join(" / ")}`;
+    const topSubtitle = topLetters.length === 1 ? CHOICE_PROFILE_MAP[topLetters[0]].subtitle : "";
 
     resultsEl.innerHTML = `
       <div class="nbk-card">
@@ -233,21 +303,23 @@
           </div>
         </div>
 
-        <div class="nbk-scores" role="list" aria-label="คะแนนรายมิติ">
-          <div class="nbk-score" role="listitem"><span class="k">D(กระทิง)</span><span class="v">${scores.D}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">I(อินทรี)</span><span class="v">${scores.i}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">S(หนู)</span><span class="v">${scores.S}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">C(หมี)</span><span class="v">${scores.C}</span></div>
+        <div class="nbk-scores" role="list" aria-label="จำนวนคำตอบรายตัวเลือก">
+          <div class="nbk-score" role="listitem"><span class="k">A (กระทิง / D)</span><span class="v">${choiceCounts.A}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">B (อินทรี / I)</span><span class="v">${choiceCounts.B}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">C (หนู / S)</span><span class="v">${choiceCounts.C}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">D (หมี / C)</span><span class="v">${choiceCounts.D}</span></div>
         </div>
 
         <div class="nbk-meta">
           <div class="nbk-meta-line"><strong>${topLabel}</strong></div>
-          ${topIntensity ? `<div class="nbk-meta-line">${topIntensity}</div>` : ""}
-          ${top2Key && pairHtml ? `<div class="nbk-meta-line"><strong>Top 2:</strong> ${top2Key}</div>` : ""}
+          ${topSubtitle ? `<div class="nbk-meta-line">${topSubtitle}</div>` : ""}
+          <div class="nbk-meta-line">จำนวนข้อที่ตอบแล้ว: ${choiceTotal}/24</div>
         </div>
 
-        ${styleHtml ? `<div class="nbk-explain"><div class="nbk-explain-title">คำอธิบายสไตล์</div>${styleHtml}</div>` : ""}
-        ${pairHtml ? `<div class="nbk-explain"><div class="nbk-explain-title">การแปลผลแบบคู่ (Top 2)</div><div>${pairHtml}</div></div>` : ""}
+        <div class="nbk-explain">
+          <div class="nbk-explain-title">คะแนนมิติ DISC (ตาม Scoring Key รายข้อ)</div>
+          <div>D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}</div>
+        </div>
 
         <div class="nbk-actions">
           <button type="button" class="nbk-btn nbk-btn-send" data-action="send">ส่งผล</button>
@@ -267,8 +339,6 @@
    * @param {{ question: string, options: Record<ChoiceLetter, string> }[]} items
    */
   function buildQuizUI(quizMount, items) {
-    const styleCards = readStyleCards();
-    const pairBlurbs = readPairBlurbs();
     const stored = loadAnswers();
 
     /** @type {Record<string, ChoiceLetter>} */
@@ -361,7 +431,8 @@
       for (let q = 1; q <= items.length; q++) {
         const choice = answers[`q${q}`];
         if (!choice) continue;
-        const disc = CHOICE_TO_DISC[choice];
+        const discByQuestion = QUESTION_SCORING[q - 1];
+        const disc = discByQuestion ? discByQuestion[choice] : CHOICE_TO_DISC[choice];
         scores[disc] += 1;
       }
       return scores;
@@ -385,7 +456,7 @@
 
     function update() {
       const scores = calcScores();
-      renderResults(resultsEl, scores, styleCards, pairBlurbs, isComplete());
+      renderResults(resultsEl, scores, calcChoiceCounts(answers, items.length), isComplete());
       updateDots();
     }
 
@@ -409,14 +480,21 @@
 
       if (action === "copy") {
         const scores = calcScores();
-        const { top, top2 } = topStyles(scores);
-        const topLabel = top.length > 1 ? `Top (tie): ${top.map(formatDiscLabel).join("/")}` : `Top: ${formatDiscLabel(top[0])} (${intensity(scores[top[0]])})`;
-        const top2Key = top.length > 1 ? "" : `${top2[0]}/${top2[1]}`;
+        const choiceCounts = calcChoiceCounts(answers, items.length);
+        const topLetters = topChoiceLetters(choiceCounts);
+        const topText = topLetters.length === 1
+          ? `${CHOICE_PROFILE_MAP[topLetters[0]].emoji} ${CHOICE_PROFILE_MAP[topLetters[0]].title}`
+          : `ผลเสมอ: ${topLetters.join("/")}`;
         const text =
-          `DISC (24 ข้อ)\n` +
-          `D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}\n` +
-          `${topLabel}\n` +
-          (top2Key ? `Top2: ${top2Key}\n` : "");
+          `DISC (24 ข้อ)
+` +
+          `A=${choiceCounts.A}, B=${choiceCounts.B}, C=${choiceCounts.C}, D=${choiceCounts.D}
+` +
+          `${topText}
+` +
+          `D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}
+`;
+
 
         try {
           await navigator.clipboard.writeText(text);
