@@ -15,6 +15,13 @@
 
   const STORAGE_KEY = "disc_quiz_v1_answers";
 
+  const DISC_PROFILE_MAP = /** @type {const} */ ({
+    D: { letter: "D", animal: "กระทิง", name: "Dominance" },
+    i: { letter: "I", animal: "อินทรี", name: "Influence" },
+    S: { letter: "S", animal: "หนู", name: "Steadiness" },
+    C: { letter: "C", animal: "หมี", name: "Conscientiousness" },
+  });
+
   /**
    * Extract question + options from the existing <ol class="questionnaire"> so the HTML remains the source of truth.
    * @param {HTMLOListElement} ol
@@ -162,6 +169,15 @@
   }
 
   /**
+   * @param {DiscLetter} key
+   * @returns {string}
+   */
+  function formatDiscLabel(key) {
+    const info = DISC_PROFILE_MAP[key];
+    return `${info.letter}(${info.animal})`;
+  }
+
+  /**
    * @param {HTMLElement} root
    * @param {number} total
    * @returns {HTMLElement}
@@ -199,7 +215,7 @@
     const { top, top2 } = topStyles(scores);
 
     const total = scores.D + scores.i + scores.S + scores.C;
-    const topLabel = top.length > 1 ? `Top (เสมอ): ${top.join(" / ")}` : `Top: ${top[0]}`;
+    const topLabel = top.length > 1 ? `Top (เสมอ): ${top.map(formatDiscLabel).join(" / ")}` : `Top: ${formatDiscLabel(top[0])}`;
     const topIntensity = top.length === 1 ? `ความเด่นชัด: ${intensity(scores[top[0]])}` : "";
 
     const top2Key = top.length > 1 ? "" : `${top2[0]}/${top2[1]}`;
@@ -218,10 +234,10 @@
         </div>
 
         <div class="nbk-scores" role="list" aria-label="คะแนนรายมิติ">
-          <div class="nbk-score" role="listitem"><span class="k">D</span><span class="v">${scores.D}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">i</span><span class="v">${scores.i}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">S</span><span class="v">${scores.S}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">C</span><span class="v">${scores.C}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">D(กระทิง)</span><span class="v">${scores.D}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">I(อินทรี)</span><span class="v">${scores.i}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">S(หนู)</span><span class="v">${scores.S}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">C(หมี)</span><span class="v">${scores.C}</span></div>
         </div>
 
         <div class="nbk-meta">
@@ -394,11 +410,11 @@
       if (action === "copy") {
         const scores = calcScores();
         const { top, top2 } = topStyles(scores);
-        const topLabel = top.length > 1 ? `Top (tie): ${top.join("/")}` : `Top: ${top[0]} (${intensity(scores[top[0]])})`;
+        const topLabel = top.length > 1 ? `Top (tie): ${top.map(formatDiscLabel).join("/")}` : `Top: ${formatDiscLabel(top[0])} (${intensity(scores[top[0]])})`;
         const top2Key = top.length > 1 ? "" : `${top2[0]}/${top2[1]}`;
         const text =
           `DISC (24 ข้อ)\n` +
-          `D=${scores.D}, i=${scores.i}, S=${scores.S}, C=${scores.C}\n` +
+          `D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}\n` +
           `${topLabel}\n` +
           (top2Key ? `Top2: ${top2Key}\n` : "");
 
