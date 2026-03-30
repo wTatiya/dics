@@ -304,6 +304,120 @@
     return counts;
   }
 
+  /** Max points per DISC dimension (one dimension per answered question). */
+  const DISC_RADAR_MAX = 24;
+
+  /**
+   * Draw a 4-axis radar for D / I / S / C scores (0–24 each).
+   * @param {HTMLCanvasElement} canvas
+   * @param {Record<DiscLetter, number>} scores
+   */
+  function renderDiscRadar(canvas, scores) {
+    const W = 360;
+    const H = 400;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = `${W}px`;
+    canvas.style.height = `${H}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const labelPad = 52;
+    const radius = Math.min(W, H) / 2 - labelPad;
+
+    /** Order: top D, right I, bottom S, left C */
+    const dims = /** @type {const} */ ([
+      { key: /** @type {DiscLetter} */ ("D"), letter: "D", emoji: "🐂", short: "กระทิง" },
+      { key: /** @type {DiscLetter} */ ("i"), letter: "I", emoji: "🦅", short: "อินทรี" },
+      { key: /** @type {DiscLetter} */ ("S"), letter: "S", emoji: "🐭", short: "หนู" },
+      { key: /** @type {DiscLetter} */ ("C"), letter: "C", emoji: "🧸", short: "หมี" },
+    ]);
+
+    const n = dims.length;
+    const values = dims.map((d) => scores[d.key]);
+    const angles = dims.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
+
+    function pointAt(angle, dist) {
+      return {
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist,
+      };
+    }
+
+    // Grid rings (25%, 50%, 75%, 100%)
+    ctx.strokeStyle = "rgba(17, 24, 39, 0.08)";
+    ctx.lineWidth = 1;
+    for (let g = 1; g <= 4; g++) {
+      const rr = (radius * g) / 4;
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const a = angles[i % n];
+        const p = pointAt(a, rr);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = "rgba(17, 24, 39, 0.12)";
+    for (let i = 0; i < n; i++) {
+      const p = pointAt(angles[i], radius);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+
+    // Data polygon
+    const fillPts = values.map((v, i) => {
+      const t = Math.min(Math.max(v / DISC_RADAR_MAX, 0), 1);
+      return pointAt(angles[i], radius * t);
+    });
+
+    ctx.beginPath();
+    fillPts.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = "rgba(59, 130, 246, 0.22)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(37, 99, 235, 0.85)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Vertices + scores
+    ctx.font = '600 12px "Noto Sans Thai", system-ui, sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < n; i++) {
+      const p = fillPts[i];
+      ctx.fillStyle = "#1d4ed8";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      const outer = pointAt(angles[i], radius + 26);
+      ctx.fillStyle = "rgba(17, 24, 39, 0.88)";
+      ctx.font = '700 13px "Noto Sans Thai", system-ui, sans-serif';
+      ctx.fillText(`${dims[i].emoji} ${dims[i].letter}`, outer.x, outer.y - 8);
+      ctx.font = '600 11px "Noto Sans Thai", system-ui, sans-serif';
+      ctx.fillStyle = "rgba(17, 24, 39, 0.55)";
+      ctx.fillText(dims[i].short, outer.x, outer.y + 6);
+      ctx.font = '700 12px "Noto Sans Thai", system-ui, sans-serif';
+      ctx.fillStyle = "rgba(37, 99, 235, 0.95)";
+      ctx.fillText(String(values[i]), outer.x, outer.y + 20);
+    }
+  }
+
   /**
    * @param {HTMLElement} resultsEl
    * @param {Record<DiscLetter, number>} scores
@@ -356,7 +470,22 @@
           *ผลนี้ใช้เพื่อสะท้อนตนเองและการสื่อสารในทีม ไม่ใช่เครื่องมือเชิงคลินิก
         </div>
       </div>
+
+      <div class="nbk-radar-card" aria-label="กราฟเรดาร์คะแนนมิติ DISC">
+        <div class="nbk-radar-head">
+          <h4 class="nbk-radar-title">โปรไฟล์ DISC</h4>
+          <p class="nbk-radar-caption">เปรียบเทียบ 4 มิติจากคำตอบที่มีอยู่ (สเกลข้อละ 1 คะแนน สูงสุด ${DISC_RADAR_MAX} ต่อมิติ)</p>
+        </div>
+        <div class="nbk-radar-canvas-wrap">
+          <canvas id="nbk-disc-radar" role="img" aria-label="เรดาร์ D I S C"></canvas>
+        </div>
+      </div>
     `;
+
+    const radarCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-radar"));
+    if (radarCanvas) {
+      requestAnimationFrame(() => renderDiscRadar(radarCanvas, scores));
+    }
   }
 
   /**

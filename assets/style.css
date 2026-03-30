@@ -580,6 +580,50 @@ thead {
   max-width: 100%;
 }
 
+.disc-quiz .nbk-radar-card {
+  margin-top: 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92), rgba(239, 246, 255, 0.65));
+  box-shadow: 0 10px 26px rgba(17, 24, 39, 0.06);
+  padding: 0.85rem 0.75rem 1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.disc-quiz .nbk-radar-head {
+  margin-bottom: 0.5rem;
+  padding: 0 0.15rem;
+}
+
+.disc-quiz .nbk-radar-title {
+  margin: 0 0 0.35rem;
+  font-weight: 800;
+  font-size: 1rem;
+  color: rgba(17, 24, 39, 0.92);
+}
+
+.disc-quiz .nbk-radar-caption {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.disc-quiz .nbk-radar-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.disc-quiz .nbk-radar-canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .disc-quiz .nbk-card-head {
   display: flex;
   align-items: center;
