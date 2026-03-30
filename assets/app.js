@@ -424,14 +424,24 @@
    * @param {Record<ChoiceLetter, number>} choiceCounts
    * @param {boolean} complete
    */
-  function renderResults(resultsEl, scores, choiceCounts, complete) {
-    const { top: topDisc } = topStyles(scores);
+  /**
+   * @param {HTMLElement} resultsEl
+   * @param {Record<DiscLetter, number>} scores
+   * @param {Record<ChoiceLetter, number>} choiceCounts
+   * @param {boolean} complete
+   * @param {Record<string, string>} pairBlurbs
+   */
+  function renderResults(resultsEl, scores, choiceCounts, complete, pairBlurbs) {
+    const { top: topDisc, top2 } = topStyles(scores);
     const choiceTotal = choiceCounts.A + choiceCounts.B + choiceCounts.C + choiceCounts.D;
     const topProfiles = topDisc.map((d) => profileForDisc(d));
     const topLabel = topDisc.length === 1
       ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
       : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
     const topSubtitle = topDisc.length === 1 ? topProfiles[0].subtitle : "";
+
+    const pairKey = `${top2[0]}/${top2[1]}`;
+    const pairHtml = pairBlurbs[pairKey];
 
     resultsEl.innerHTML = `
       <div class="nbk-card">
@@ -442,22 +452,23 @@
           </div>
         </div>
 
-        <div class="nbk-scores" role="list" aria-label="จำนวนครั้งที่เลือกตัวเลือก A–D (ดิบ)">
-          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก A</span><span class="v">${choiceCounts.A}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก B</span><span class="v">${choiceCounts.B}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก C</span><span class="v">${choiceCounts.C}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก D</span><span class="v">${choiceCounts.D}</span></div>
+        <div class="nbk-scores" role="list" aria-label="คะแนนมิติ DISC (D I S C)">
+          <div class="nbk-score" role="listitem"><span class="k">🐂 D(กระทิง)</span><span class="v">${scores.D}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">🦅 I(อินทรี)</span><span class="v">${scores.i}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">🐭 S(หนู)</span><span class="v">${scores.S}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">🧸 C(หมี)</span><span class="v">${scores.C}</span></div>
         </div>
 
         <div class="nbk-meta">
-          <div class="nbk-meta-line"><strong>${topLabel}</strong></div>
           ${topSubtitle ? `<div class="nbk-meta-line">${topSubtitle}</div>` : ""}
           <div class="nbk-meta-line">จำนวนข้อที่ตอบแล้ว: ${choiceTotal}/24</div>
         </div>
 
         <div class="nbk-explain">
-          <div class="nbk-explain-title">คะแนนมิติ DISC (ตาม Scoring Key รายข้อ)</div>
-          <div>D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}</div>
+          <div class="nbk-explain-title">คู่สไตล์ (Top 2)</div>
+          <div>
+            ${pairHtml ? pairHtml : `<strong>${pairKey}:</strong> ${formatDiscLabel(top2[0])} / ${formatDiscLabel(top2[1])}`}
+          </div>
         </div>
 
         <div class="nbk-actions">
@@ -494,6 +505,7 @@
    */
   function buildQuizUI(quizMount, items) {
     const stored = loadAnswers();
+    const pairBlurbs = readPairBlurbs();
 
     /** @type {Record<string, ChoiceLetter>} */
     const answers = { ...stored };
@@ -613,7 +625,7 @@
 
     function update() {
       const scores = calcScores();
-      renderResults(resultsEl, scores, calcChoiceCounts(answers, items.length), isComplete());
+      renderResults(resultsEl, scores, calcChoiceCounts(answers, items.length), isComplete(), pairBlurbs);
       updateDots();
     }
 
