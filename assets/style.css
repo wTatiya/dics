@@ -249,6 +249,7 @@ thead {
 
 .disc-quiz {
   margin-top: 1.25rem;
+  min-width: 0;
 }
 
 /* Sheet container */
@@ -264,6 +265,7 @@ thead {
 /* Paper texture + ruled lines */
 .disc-quiz .nbk-paper {
   position: relative;
+  min-width: 0;
   padding: 1.1rem 1.1rem 1.25rem;
   background:
     radial-gradient(circle at 1px 1px, rgba(17, 24, 39, 0.05) 1px, transparent 1px) 0 0 / 18px 18px,
@@ -294,6 +296,17 @@ thead {
   display: flex;
   align-items: center;
   gap: 0.9rem;
+  min-width: 0;
+}
+
+/* Let the title/subtitle column shrink and wrap on narrow viewports */
+.disc-quiz .nbk-title > div:not(.nbk-badge) {
+  min-width: 0;
+}
+
+.disc-quiz .nbk-title-main,
+.disc-quiz .nbk-title-sub {
+  overflow-wrap: anywhere;
 }
 
 .disc-quiz .nbk-badge {
@@ -425,6 +438,7 @@ thead {
 }
 
 .disc-quiz .nbk-q {
+  min-width: 0;
   border: 1px solid rgba(17, 24, 39, 0.08);
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.72);
@@ -438,6 +452,9 @@ thead {
   align-items: baseline;
   margin-bottom: 0.6rem;
   padding: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .disc-quiz .nbk-qno {
@@ -452,19 +469,23 @@ thead {
 }
 
 .disc-quiz .nbk-qtext {
+  flex: 1;
+  min-width: 0;
   font-weight: 700;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 /* Options */
 .disc-quiz .nbk-opts {
   display: grid;
   gap: 0.45rem;
+  min-width: 0;
 }
 
 .disc-quiz .nbk-opt {
   display: grid;
-  grid-template-columns: 18px 28px 1fr;
+  grid-template-columns: 18px 28px minmax(0, 1fr);
   align-items: start;
   gap: 0.55rem;
   padding: 0.55rem 0.6rem;
@@ -472,6 +493,7 @@ thead {
   border: 1px solid rgba(17, 24, 39, 0.06);
   background: rgba(255, 255, 255, 0.6);
   cursor: pointer;
+  min-width: 0;
 }
 
 .disc-quiz .nbk-opt:hover {
@@ -495,8 +517,10 @@ thead {
 }
 
 .disc-quiz .nbk-opt-text {
+  min-width: 0;
   line-height: 1.35;
   color: rgba(17, 24, 39, 0.88);
+  overflow-wrap: anywhere;
 }
 
 /* Selected state */
