@@ -381,14 +381,17 @@
       const qNum = i + 1;
       const item = items[i];
 
-      const fs = document.createElement("fieldset");
-      fs.className = "nbk-q";
-      fs.id = `nbk-q-${qNum}`;
-      fs.innerHTML = `
-        <legend>
+      const block = document.createElement("div");
+      block.className = "nbk-q";
+      block.id = `nbk-q-${qNum}`;
+      const qtextId = `nbk-qtext-${qNum}`;
+      block.setAttribute("role", "group");
+      block.setAttribute("aria-labelledby", qtextId);
+      block.innerHTML = `
+        <div class="nbk-q-head" id="${qtextId}">
           <span class="nbk-qno">${qNum}</span>
           <span class="nbk-qtext">${escapeHtml(item.question)}</span>
-        </legend>
+        </div>
         <div class="nbk-opts">
           ${(["A","B","C","D"]).map((letter) => {
             const l = /** @type {ChoiceLetter} */ (letter);
@@ -404,16 +407,16 @@
           }).join("")}
         </div>
       `;
-      grid.appendChild(fs);
+      grid.appendChild(block);
 
       // Restore choice
       const storedChoice = answers[`q${qNum}`];
       if (storedChoice) {
-        const input = fs.querySelector(`input[value="${storedChoice}"]`);
+        const input = block.querySelector(`input[value="${storedChoice}"]`);
         if (input) /** @type {HTMLInputElement} */ (input).checked = true;
       }
 
-      fs.addEventListener("change", (ev) => {
+      block.addEventListener("change", (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLInputElement)) return;
         if (t.name !== `q${qNum}`) return;
