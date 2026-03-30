@@ -1,0 +1,71 @@
+# Builds the static site and injects DISC webhook settings from repository secrets
+# (secrets are not available to the browser at runtime — only baked in during this deploy).
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write submission-config.js from secrets
+        env:
+          DISC_WEBHOOK_URL: ${{ secrets.DISC_WEBHOOK_URL }}
+          DISC_WEBHOOK_TOKEN: ${{ secrets.DISC_WEBHOOK_TOKEN }}
+        run: |
+          python3 << 'PY'
+          import json
+          import os
+
+          url = (os.environ.get("DISC_WEBHOOK_URL") or "").strip()
+          token = (os.environ.get("DISC_WEBHOOK_TOKEN") or "").strip()
+          enabled = bool(url)
+
+          cfg = {
+              "enabled": enabled,
+              "webhookUrl": url,
+              "webhookToken": token,
+          }
+
+          js = (
+              "// Generated in CI from repository secrets (DISC_WEBHOOK_URL, DISC_WEBHOOK_TOKEN).\n"
+              "window.DISC_OWNER_SUBMISSION_CONFIG = "
+              + json.dumps(cfg, ensure_ascii=False)
+              + ";\n"
+          )
+
+          with open("assets/submission-config.js", "w", encoding="utf-8") as f:
+              f.write(js)
+          PY
+
+      - name: Assemble site directory
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r assets _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

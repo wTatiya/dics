@@ -19,3 +19,7 @@ def test_js_exists():
     root = Path(__file__).resolve().parents[1]
     js_path = root / "assets" / "app.js"
     assert js_path.exists()
+    assert (root / "assets" / "submission.js").exists()
+    assert (root / "assets" / "submission-config.js").exists()
+    assert (root / "google-apps-script" / "Webhook.gs").exists()
+    assert (root / ".github" / "workflows" / "deploy-pages.yml").exists()

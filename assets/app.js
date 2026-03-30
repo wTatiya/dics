@@ -73,6 +73,41 @@
   });
 
   /**
+   * Blurb/emoji for DISC results — CHOICE_PROFILE_MAP was authored in A=D, B=i, C=S, D=C order.
+   * @param {DiscLetter} disc
+   */
+  function profileForDisc(disc) {
+    const key =
+      disc === "D" ? "A" :
+      disc === "i" ? "B" :
+      disc === "S" ? "C" : "D";
+    return CHOICE_PROFILE_MAP[/** @type {ChoiceLetter} */ (key)];
+  }
+
+  /**
+   * Deterministic shuffle so option order varies by question but stays stable across reloads.
+   * @param {number} seed
+   * @template T
+   * @param {T[]} items
+   * @returns {T[]}
+   */
+  function seededShuffle(seed, items) {
+    const arr = items.slice();
+    let s = seed >>> 0;
+    const rand = () => {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      const t = arr[i];
+      arr[i] = arr[j];
+      arr[j] = t;
+    }
+    return arr;
+  }
+
+  /**
    * Extract question + options from the existing <ol class="questionnaire"> so the HTML remains the source of truth.
    * @param {HTMLOListElement} ol
    * @returns {{ question: string, options: Record<ChoiceLetter, string> }[]}
@@ -270,29 +305,19 @@
   }
 
   /**
-   * @param {Record<ChoiceLetter, number>} counts
-   * @returns {ChoiceLetter[]}
-   */
-  function topChoiceLetters(counts) {
-    const entries = /** @type {[ChoiceLetter, number][]} */ (Object.entries(counts));
-    entries.sort((a, b) => b[1] - a[1]);
-    const max = entries[0]?.[1] ?? 0;
-    return entries.filter(([, v]) => v === max).map(([k]) => k);
-  }
-
-  /**
    * @param {HTMLElement} resultsEl
    * @param {Record<DiscLetter, number>} scores
    * @param {Record<ChoiceLetter, number>} choiceCounts
    * @param {boolean} complete
    */
   function renderResults(resultsEl, scores, choiceCounts, complete) {
-    const topLetters = topChoiceLetters(choiceCounts);
+    const { top: topDisc } = topStyles(scores);
     const choiceTotal = choiceCounts.A + choiceCounts.B + choiceCounts.C + choiceCounts.D;
-    const topLabel = topLetters.length === 1
-      ? `${CHOICE_PROFILE_MAP[topLetters[0]].emoji} ${CHOICE_PROFILE_MAP[topLetters[0]].title}`
-      : `ผลเสมอ: ${topLetters.map((l) => `${CHOICE_PROFILE_MAP[l].emoji} ${l}`).join(" / ")}`;
-    const topSubtitle = topLetters.length === 1 ? CHOICE_PROFILE_MAP[topLetters[0]].subtitle : "";
+    const topProfiles = topDisc.map((d) => profileForDisc(d));
+    const topLabel = topDisc.length === 1
+      ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
+      : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
+    const topSubtitle = topDisc.length === 1 ? topProfiles[0].subtitle : "";
 
     resultsEl.innerHTML = `
       <div class="nbk-card">
@@ -303,11 +328,11 @@
           </div>
         </div>
 
-        <div class="nbk-scores" role="list" aria-label="จำนวนคำตอบรายตัวเลือก">
-          <div class="nbk-score" role="listitem"><span class="k">A (กระทิง / D)</span><span class="v">${choiceCounts.A}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">B (อินทรี / I)</span><span class="v">${choiceCounts.B}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">C (หนู / S)</span><span class="v">${choiceCounts.C}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">D (หมี / C)</span><span class="v">${choiceCounts.D}</span></div>
+        <div class="nbk-scores" role="list" aria-label="จำนวนครั้งที่เลือกตัวเลือก A–D (ดิบ)">
+          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก A</span><span class="v">${choiceCounts.A}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก B</span><span class="v">${choiceCounts.B}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก C</span><span class="v">${choiceCounts.C}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">ตัวเลือก D</span><span class="v">${choiceCounts.D}</span></div>
         </div>
 
         <div class="nbk-meta">
@@ -393,7 +418,7 @@
           <span class="nbk-qtext">${escapeHtml(item.question)}</span>
         </div>
         <div class="nbk-opts">
-          ${(["A","B","C","D"]).map((letter) => {
+          ${seededShuffle(qNum * 7919 + 104729, /** @type {ChoiceLetter[]} */ (["A", "B", "C", "D"])).map((letter) => {
             const l = /** @type {ChoiceLetter} */ (letter);
             const val = escapeHtml(item.options[l]);
             const id = `nbk-q${qNum}-${l}`;
@@ -484,18 +509,19 @@
       if (action === "copy") {
         const scores = calcScores();
         const choiceCounts = calcChoiceCounts(answers, items.length);
-        const topLetters = topChoiceLetters(choiceCounts);
-        const topText = topLetters.length === 1
-          ? `${CHOICE_PROFILE_MAP[topLetters[0]].emoji} ${CHOICE_PROFILE_MAP[topLetters[0]].title}`
-          : `ผลเสมอ: ${topLetters.join("/")}`;
+        const { top: topDisc } = topStyles(scores);
+        const topProfiles = topDisc.map((d) => profileForDisc(d));
+        const topText = topDisc.length === 1
+          ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
+          : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
         const text =
           `DISC (24 ข้อ)
 ` +
-          `A=${choiceCounts.A}, B=${choiceCounts.B}, C=${choiceCounts.C}, D=${choiceCounts.D}
+          `ตัวเลือก A–D (ดิบ): A=${choiceCounts.A}, B=${choiceCounts.B}, C=${choiceCounts.C}, D=${choiceCounts.D}
 ` +
           `${topText}
 ` +
-          `D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}
+          `คะแนน DISC: D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}
 `;
 
 
@@ -509,6 +535,40 @@
       }
 
       if (action === "send") {
+        const scores = calcScores();
+        const choiceCounts = calcChoiceCounts(answers, items.length);
+        const { top: topDisc } = topStyles(scores);
+        const topProfiles = topDisc.map((d) => profileForDisc(d));
+        const resultSummary =
+          topDisc.length === 1
+            ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
+            : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
+
+        const cfg = window.DISC_OWNER_SUBMISSION_CONFIG;
+        const submitFn = window.submitDiscSubmissionToOwner;
+        if (cfg && cfg.enabled && typeof submitFn === "function") {
+          /** @type {Record<string, unknown>} */
+          const row = {
+            submitted_at: new Date().toISOString(),
+            result_summary: resultSummary,
+            disc_score_d: scores.D,
+            disc_score_i: scores.i,
+            disc_score_s: scores.S,
+            disc_score_c: scores.C,
+            raw_choice_a: choiceCounts.A,
+            raw_choice_b: choiceCounts.B,
+            raw_choice_c: choiceCounts.C,
+            raw_choice_d: choiceCounts.D,
+            answers: { ...answers },
+          };
+          const sent = await submitFn(row);
+          if (sent.ok) {
+            flashStatus(resultsEl, "ส่งผลให้ผู้ดูแลระบบแล้ว");
+          } else if (sent.error !== "not_configured") {
+            flashStatus(resultsEl, "ส่งผลไม่สำเร็จ โปรดลองอีกครั้ง");
+          }
+        }
+
         window.open("https://www.menti.com/alozdhwzj9id?source=qr-page", "_blank", "noopener,noreferrer");
       }
     });
