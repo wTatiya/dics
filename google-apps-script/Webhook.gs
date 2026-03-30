@@ -16,7 +16,7 @@
  */
 
 /** @type {string} */
-var SPREADSHEET_ID = "PASTE_YOUR_SPREADSHEET_ID_HERE";
+var SPREADSHEET_ID = "1PbaZxoj_HwnUGeIiMTN2kzCquAilMtFK4skOfV_JUWM";
 /** Tab name; created if missing */
 var SHEET_NAME = "DiscSubmissions";
 
