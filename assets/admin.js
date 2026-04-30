@@ -281,6 +281,10 @@
     setTimeout(() => t.remove(), 1400);
   }
 
+  const LIVE_REFRESH_MS = 15000;
+  /** @type {number | null} */
+  let liveTimer = null;
+
   /** Max range for 2-axis quadrant model using sums of two dimensions. */
   const DISC_QUADRANT_AXIS_MAX = 48;
 
@@ -619,7 +623,7 @@
             <canvas id="admin-disc-quadrant" role="img" aria-label="ควอดแรนต์ DiSC (ภาพรวมกลุ่ม)"></canvas>
           </div>
           <div class="muted" style="margin-top: 0.35rem;">
-            จุดจาง = รายบุคคล • จุดเข้ม = ค่าเฉลี่ยของกลุ่ม
+            จุดจาง = รายบุคคล • จุดเข้ม = ค่าเฉลี่ยของกลุ่ม • อัปเดตอัตโนมัติทุก ${(LIVE_REFRESH_MS / 1000).toFixed(0)} วินาที
           </div>
         </div>
 
@@ -656,11 +660,15 @@
       if (!(t instanceof HTMLElement)) return;
       const back = t.closest('[data-action="back"]');
       if (back) {
+        if (liveTimer) window.clearInterval(liveTimer);
+        liveTimer = null;
         renderGroupList(mount, tz, groups);
         return;
       }
       const logout = t.closest('[data-action="logout"]');
       if (logout) {
+        if (liveTimer) window.clearInterval(liveTimer);
+        liveTimer = null;
         try {
           sessionStorage.removeItem(AUTH_KEY);
         } catch {}
@@ -687,6 +695,35 @@
     if (quad) {
       requestAnimationFrame(() => renderAdminQuadrant(quad, rows));
     }
+
+    // Live refresh: re-fetch sheet CSV and re-render if group changed.
+    if (liveTimer) window.clearInterval(liveTimer);
+    liveTimer = window.setInterval(async () => {
+      try {
+        const cfg = getCfg();
+        if (!cfg.sheet.spreadsheetId) return;
+        const url = sheetCsvUrl(cfg.sheet.spreadsheetId, cfg.sheet.sheetName);
+        const res = await fetch(url, { cache: "no-cache" });
+        if (!res.ok) return;
+        const text = await res.text();
+        const allRows = rowsFromCsv(text).filter((r) => !!r.submitted_at);
+        /** @type {Record<string, SubmissionRow[]>} */
+        const newGroups = {};
+        for (const r of allRows) {
+          const key = dateKey(cfg.timeZone, r.submitted_at);
+          (newGroups[key] ||= []).push(r);
+        }
+        const newRows = newGroups[date] || [];
+        // Compare quick signature to avoid re-render spam.
+        const sig = JSON.stringify(rows.map((r) => [r.submitted_at, r.disc_score_d, r.disc_score_i, r.disc_score_s, r.disc_score_c]));
+        const newSig = JSON.stringify(newRows.map((r) => [r.submitted_at, r.disc_score_d, r.disc_score_i, r.disc_score_s, r.disc_score_c]));
+        if (sig !== newSig) {
+          renderGroupDetail(mount, cfg.timeZone, date, newRows, newGroups);
+        }
+      } catch {
+        // ignore transient failures
+      }
+    }, LIVE_REFRESH_MS);
   }
 
   /** @param {string} s */
