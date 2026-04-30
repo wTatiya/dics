@@ -160,6 +160,25 @@
     }).format(d);
   }
 
+  /**
+   * Display-only label for a YYYY-MM-DD group key in Thai Buddhist calendar.
+   * @param {string} tz
+   * @param {string} ymd
+   */
+  function groupDateLabel(tz, ymd) {
+    const key = String(ymd || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return key || "unknown";
+    // Use a stable time to avoid timezone edge cases.
+    const d = new Date(`${key}T12:00:00Z`);
+    if (!Number.isFinite(d.getTime())) return key;
+    return new Intl.DateTimeFormat("th-TH-u-ca-buddhist", {
+      timeZone: tz,
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+    }).format(d);
+  }
+
   /** @param {SubmissionRow} row */
   function topStyles(row) {
     const scores = [
@@ -302,7 +321,7 @@
         return `
           <button type="button" class="admin-date" data-date="${escapeHtml(d)}">
             <div class="admin-date-main">
-              <div class="admin-date-title">${escapeHtml(d)}</div>
+              <div class="admin-date-title">${escapeHtml(groupDateLabel(tz, d))}</div>
               <div class="admin-date-sub muted">${rows.length} รายการ</div>
             </div>
             <div class="admin-date-metrics">
@@ -412,7 +431,7 @@
       <div class="card admin-card">
         <div class="admin-head">
           <div>
-            <h2>สรุป/วิเคราะห์: ${escapeHtml(date)}</h2>
+            <h2>สรุป/วิเคราะห์: ${escapeHtml(groupDateLabel(tz, date))}</h2>
             <p class="muted">${rows.length} รายการ</p>
           </div>
           <div class="admin-actions">
