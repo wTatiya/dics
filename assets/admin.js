@@ -219,15 +219,15 @@
   function renderLogin(mount) {
     mount.innerHTML = `
       <div class="card admin-card">
-        <h2>Admin login</h2>
-        <p class="muted">Enter password to view submissions.</p>
+        <h2>เข้าสู่ระบบผู้ดูแล</h2>
+        <p class="muted">กรอกรหัสผ่านเพื่อดูรายการส่งผล</p>
         <form class="admin-login" autocomplete="off">
           <label class="admin-label">
-            <span>Password</span>
-            <input class="admin-input" type="password" name="password" placeholder="Password" required />
+            <span>รหัสผ่าน</span>
+            <input class="admin-input" type="password" name="password" placeholder="รหัสผ่าน" required />
           </label>
           <div class="admin-actions">
-            <button class="button" type="submit">Enter</button>
+            <button class="button" type="submit">เข้าสู่ระบบ</button>
           </div>
           <div class="admin-error" aria-live="polite"></div>
         </form>
@@ -249,7 +249,7 @@
         } catch {}
         renderApp(mount);
       } else {
-        err.textContent = "Wrong password.";
+        err.textContent = "รหัสผ่านไม่ถูกต้อง";
       }
     });
   }
@@ -271,7 +271,7 @@
           <button type="button" class="admin-date" data-date="${escapeHtml(d)}">
             <div class="admin-date-main">
               <div class="admin-date-title">${escapeHtml(d)}</div>
-              <div class="admin-date-sub muted">${rows.length} submissions</div>
+              <div class="admin-date-sub muted">${rows.length} รายการ</div>
             </div>
             <div class="admin-date-metrics">
               <span class="pill">D ${avg.d.toFixed(1)}</span>
@@ -288,15 +288,15 @@
       <div class="card admin-card">
         <div class="admin-head">
           <div>
-            <h2>Submissions by date</h2>
-            <p class="muted">Click a date to open analysis for that group.</p>
+            <h2>รายการส่งผลตามวันที่</h2>
+            <p class="muted">คลิกวันที่เพื่อดูสรุป/วิเคราะห์ของกลุ่มนั้น</p>
           </div>
           <div class="admin-actions">
-            <button type="button" class="nbk-btn nbk-btn-ghost" data-action="logout">Logout</button>
+            <button type="button" class="nbk-btn nbk-btn-ghost" data-action="logout">ออกจากระบบ</button>
           </div>
         </div>
         <div class="admin-list">
-          ${itemsHtml || `<div class="muted">No submissions found.</div>`}
+          ${itemsHtml || `<div class="muted">ไม่พบรายการส่งผล</div>`}
         </div>
       </div>
     `;
@@ -334,11 +334,11 @@
     const top = agg.topCount;
     const topHtml = `
       <div class="admin-kpi-grid">
-        <div class="admin-kpi"><div class="k">Top D</div><div class="v">${top.D}</div></div>
-        <div class="admin-kpi"><div class="k">Top I</div><div class="v">${top.I}</div></div>
-        <div class="admin-kpi"><div class="k">Top S</div><div class="v">${top.S}</div></div>
-        <div class="admin-kpi"><div class="k">Top C</div><div class="v">${top.C}</div></div>
-        <div class="admin-kpi"><div class="k">Ties</div><div class="v">${top.tie}</div></div>
+        <div class="admin-kpi"><div class="k">เด่น D</div><div class="v">${top.D}</div></div>
+        <div class="admin-kpi"><div class="k">เด่น I</div><div class="v">${top.I}</div></div>
+        <div class="admin-kpi"><div class="k">เด่น S</div><div class="v">${top.S}</div></div>
+        <div class="admin-kpi"><div class="k">เด่น C</div><div class="v">${top.C}</div></div>
+        <div class="admin-kpi"><div class="k">เสมอ</div><div class="v">${top.tie}</div></div>
       </div>
     `;
 
@@ -348,12 +348,25 @@
 
     const tableRows = sorted
       .map((r) => {
+        const jsonRaw = String(r.answers_json || "");
+        const jsonTrim = jsonRaw.trim();
+        const jsonShort =
+          jsonTrim.length > 220 ? `${jsonTrim.slice(0, 220)}…` : jsonTrim;
         return `
           <tr>
             <td class="mono">${escapeHtml(timeLabel(tz, r.submitted_at))}</td>
             <td>${escapeHtml(r.result_summary || "")}</td>
             <td class="mono">D ${r.disc_score_d} / I ${r.disc_score_i} / S ${r.disc_score_s} / C ${r.disc_score_c}</td>
-            <td class="mono">${escapeHtml(r.answers_json || "")}</td>
+            <td class="mono admin-json">
+              ${
+                jsonTrim
+                  ? `<details class="admin-json-details">
+                      <summary class="admin-json-summary">${escapeHtml(jsonShort)}</summary>
+                      <pre class="admin-json-pre">${escapeHtml(jsonTrim)}</pre>
+                    </details>`
+                  : `<span class="muted">—</span>`
+              }
+            </td>
           </tr>
         `;
       })
@@ -363,46 +376,46 @@
       <div class="card admin-card">
         <div class="admin-head">
           <div>
-            <h2>Analysis: ${escapeHtml(date)}</h2>
-            <p class="muted">${rows.length} submissions</p>
+            <h2>สรุป/วิเคราะห์: ${escapeHtml(date)}</h2>
+            <p class="muted">${rows.length} รายการ</p>
           </div>
           <div class="admin-actions">
-            <button type="button" class="nbk-btn" data-action="back">Back</button>
-            <button type="button" class="nbk-btn nbk-btn-ghost" data-action="logout">Logout</button>
+            <button type="button" class="nbk-btn" data-action="back">ย้อนกลับ</button>
+            <button type="button" class="nbk-btn nbk-btn-ghost" data-action="logout">ออกจากระบบ</button>
           </div>
         </div>
 
         <div class="admin-summary">
           <div class="admin-kpi-grid">
-            <div class="admin-kpi"><div class="k">Avg D</div><div class="v">${avg.d.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">Avg I</div><div class="v">${avg.i.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">Avg S</div><div class="v">${avg.s.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">Avg C</div><div class="v">${avg.c.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">Count</div><div class="v">${agg.count}</div></div>
+            <div class="admin-kpi"><div class="k">เฉลี่ย D</div><div class="v">${avg.d.toFixed(2)}</div></div>
+            <div class="admin-kpi"><div class="k">เฉลี่ย I</div><div class="v">${avg.i.toFixed(2)}</div></div>
+            <div class="admin-kpi"><div class="k">เฉลี่ย S</div><div class="v">${avg.s.toFixed(2)}</div></div>
+            <div class="admin-kpi"><div class="k">เฉลี่ย C</div><div class="v">${avg.c.toFixed(2)}</div></div>
+            <div class="admin-kpi"><div class="k">จำนวน</div><div class="v">${agg.count}</div></div>
           </div>
           <div class="admin-block">
-            <div class="admin-block-title">Top-style distribution</div>
+            <div class="admin-block-title">สัดส่วนสไตล์เด่น</div>
             ${topHtml}
           </div>
         </div>
 
         <div class="admin-block">
           <div class="admin-block-head">
-            <div class="admin-block-title">Submissions</div>
-            <button type="button" class="nbk-btn nbk-btn-ghost" data-action="copy-json">Copy JSON</button>
+            <div class="admin-block-title">รายการส่งผล</div>
+            <button type="button" class="nbk-btn nbk-btn-ghost" data-action="copy-json">คัดลอก JSON</button>
           </div>
           <div class="admin-table-wrap">
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>Time</th>
-                  <th>Result</th>
-                  <th>Scores</th>
+                  <th>เวลา</th>
+                  <th>ผลลัพธ์</th>
+                  <th>คะแนน</th>
                   <th>answers_json</th>
                 </tr>
               </thead>
               <tbody>
-                ${tableRows || `<tr><td colspan="4" class="muted">No rows.</td></tr>`}
+                ${tableRows || `<tr><td colspan="4" class="muted">ไม่มีข้อมูล</td></tr>`}
               </tbody>
             </table>
           </div>
@@ -435,9 +448,9 @@
         const json = JSON.stringify(payload, null, 2);
         try {
           await navigator.clipboard.writeText(json);
-          toast(mount, "Copied.");
+          toast(mount, "คัดลอกแล้ว");
         } catch {
-          window.prompt("Copy:", json);
+          window.prompt("คัดลอก:", json);
         }
       }
     };
@@ -460,8 +473,8 @@
     if (!cfg.sheet.spreadsheetId) {
       mount.innerHTML = `
         <div class="card admin-card">
-          <h2>Not configured</h2>
-          <p class="muted">Missing spreadsheetId in <code>assets/admin-config.js</code>.</p>
+          <h2>ยังไม่ได้ตั้งค่า</h2>
+          <p class="muted">ไม่พบ <code>spreadsheetId</code> ใน <code>assets/admin-config.js</code></p>
         </div>
       `;
       return;
@@ -469,8 +482,8 @@
 
     mount.innerHTML = `
       <div class="card admin-card">
-        <h2>Loading…</h2>
-        <p class="muted">Fetching submissions from Google Sheets.</p>
+        <h2>กำลังโหลด…</h2>
+        <p class="muted">กำลังดึงข้อมูลจาก Google Sheets</p>
       </div>
     `;
 
@@ -484,8 +497,8 @@
     } catch (e) {
       mount.innerHTML = `
         <div class="card admin-card">
-          <h2>Failed to load</h2>
-          <p class="muted">Could not fetch the sheet CSV. If the sheet is private, publish it or make it accessible.</p>
+          <h2>โหลดไม่สำเร็จ</h2>
+          <p class="muted">ดึงไฟล์ CSV จากชีตไม่ได้ หากชีตเป็น Private ให้ Publish หรือปรับสิทธิ์ให้เข้าถึงได้</p>
           <div class="admin-code"><code>${escapeHtml(String(e))}</code></div>
         </div>
       `;

@@ -591,6 +591,17 @@ thead {
   max-width: 100%;
 }
 
+.disc-quiz .nbk-quadrant-card {
+  margin-top: 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92), rgba(243, 244, 246, 0.60));
+  box-shadow: 0 10px 26px rgba(17, 24, 39, 0.06);
+  padding: 0.85rem 0.75rem 1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .disc-quiz .nbk-radar-head {
   margin-bottom: 0.5rem;
   padding: 0 0.15rem;
@@ -964,6 +975,31 @@ thead {
   background: #f3f4f6;
 }
 
+.admin-table td {
+  max-width: 520px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-json-details {
+  max-width: 520px;
+}
+
+.admin-json-summary {
+  cursor: pointer;
+  color: rgba(17, 24, 39, 0.88);
+}
+
+.admin-json-pre {
+  margin: 0.6rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.85rem;
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .admin-code code {
   display: block;
   padding: 0.75rem;
@@ -971,4 +1007,14 @@ thead {
   background: rgba(17, 24, 39, 0.06);
   border: 1px solid rgba(17, 24, 39, 0.08);
   overflow-x: auto;
+}
+
+@media (max-width: 820px) {
+  .admin-date {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .admin-date-metrics {
+    justify-content: flex-start;
+  }
 }

@@ -43,22 +43,22 @@
   const CHOICE_PROFILE_MAP = /** @type {const} */ ({
     A: {
       emoji: "🐂",
-      title: 'คุณคือ "กระทิง" (The Bull) - D Style',
+      title: 'คุณคือ "กระทิง" (สไตล์ D)',
       subtitle: "(ผู้นำจอมพลัง ผู้มุ่งมั่นพิชิตเป้าหมาย / Dominance)",
     },
     B: {
       emoji: "🦅",
-      title: 'คุณคือ "อินทรี" (The Eagle) - I Style',
+      title: 'คุณคือ "อินทรี" (สไตล์ I)',
       subtitle: "(นักวิสัยทัศน์ ผู้สร้างแรงบันดาลใจ / Influence)",
     },
     C: {
       emoji: "🐭",
-      title: 'คุณคือ "หนู" (The Mouse) - S Style',
+      title: 'คุณคือ "หนู" (สไตล์ S)',
       subtitle: "(ผู้ประสานใจ ผู้ดูแลด้วยความห่วงใย / Steadiness)",
     },
     D: {
       emoji: "🧸",
-      title: 'คุณคือ "หมี" (The Bear) - C Style',
+      title: 'คุณคือ "หมี" (สไตล์ C)',
       subtitle: "(นักวิเคราะห์ ผู้รักษากฎระเบียบ / Conscientiousness)",
     },
   });
@@ -307,6 +307,9 @@
   /** Max points per DISC dimension (one dimension per answered question). */
   const DISC_RADAR_MAX = 24;
 
+  /** Max range for 2-axis quadrant model using sums of two dimensions. */
+  const DISC_QUADRANT_AXIS_MAX = 48;
+
   /**
    * Draw a 4-axis radar for D / I / S / C scores (0–24 each).
    * @param {HTMLCanvasElement} canvas
@@ -419,6 +422,116 @@
   }
 
   /**
+   * DiSC quadrant visualization.
+   * Axes (heuristic, Thai-friendly):
+   * - X: "คน (i+S)"  vs  "งาน (D+C)"  → People (+) / Task (-)
+   * - Y: "เร็ว (D+i)" vs  "ช้า (S+C)" → Fast (+) / Slow (-)
+   * Point shows the balance/ratio across dimensions (not a clinical measure).
+   * @param {HTMLCanvasElement} canvas
+   * @param {Record<DiscLetter, number>} scores
+   */
+  function renderDiscQuadrant(canvas, scores) {
+    const W = 360;
+    const H = 360;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = `${W}px`;
+    canvas.style.height = `${H}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const pad = 44;
+    const size = Math.min(W, H) - pad * 2;
+    const left = (W - size) / 2;
+    const top = (H - size) / 2;
+    const right = left + size;
+    const bottom = top + size;
+
+    // Normalize axes to [-1..1]
+    const peopleVsTask = (scores.i + scores.S) - (scores.D + scores.C);
+    const fastVsSlow = (scores.D + scores.i) - (scores.S + scores.C);
+    const nx = Math.max(-1, Math.min(1, peopleVsTask / DISC_QUADRANT_AXIS_MAX));
+    const ny = Math.max(-1, Math.min(1, fastVsSlow / DISC_QUADRANT_AXIS_MAX));
+
+    // Quadrant fills (very soft)
+    ctx.fillStyle = "rgba(37, 99, 235, 0.06)"; // i (people+fast)
+    ctx.fillRect(cx, top, right - cx, cy - top);
+    ctx.fillStyle = "rgba(34, 197, 94, 0.06)"; // S (people+slow)
+    ctx.fillRect(cx, cy, right - cx, bottom - cy);
+    ctx.fillStyle = "rgba(245, 158, 11, 0.06)"; // D (task+fast)
+    ctx.fillRect(left, top, cx - left, cy - top);
+    ctx.fillStyle = "rgba(148, 163, 184, 0.14)"; // C (task+slow)
+    ctx.fillRect(left, cy, cx - left, bottom - cy);
+
+    // Frame + axes
+    ctx.strokeStyle = "rgba(17, 24, 39, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(left, top, size, size);
+
+    ctx.strokeStyle = "rgba(17, 24, 39, 0.18)";
+    ctx.beginPath();
+    ctx.moveTo(cx, top);
+    ctx.lineTo(cx, bottom);
+    ctx.moveTo(left, cy);
+    ctx.lineTo(right, cy);
+    ctx.stroke();
+
+    // Labels
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = '800 14px "Noto Sans Thai", system-ui, sans-serif';
+    ctx.fillStyle = "rgba(17, 24, 39, 0.88)";
+    ctx.fillText("เร็ว", cx, top - 18);
+    ctx.fillText("ช้า", cx, bottom + 18);
+
+    ctx.save();
+    ctx.translate(left - 18, cy);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("งาน", 0, 0);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(right + 18, cy);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("คน", 0, 0);
+    ctx.restore();
+
+    // Quadrant titles
+    ctx.font = '800 13px "Noto Sans Thai", system-ui, sans-serif';
+    ctx.fillStyle = "rgba(17, 24, 39, 0.92)";
+    ctx.fillText("🐂 D", left + size * 0.25, top + size * 0.18);
+    ctx.fillText("🦅 I", left + size * 0.75, top + size * 0.18);
+    ctx.fillText("🐭 S", left + size * 0.75, top + size * 0.82);
+    ctx.fillText("🧸 C", left + size * 0.25, top + size * 0.82);
+
+    // Plot point
+    const px = cx + (size / 2) * nx;
+    const py = cy - (size / 2) * ny;
+
+    // Shadow ring
+    ctx.fillStyle = "rgba(37, 99, 235, 0.18)";
+    ctx.beginPath();
+    ctx.arc(px, py, 10.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(37, 99, 235, 0.95)";
+    ctx.beginPath();
+    ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Annotation
+    ctx.font = '700 12px "Noto Sans Thai", system-ui, sans-serif';
+    ctx.fillStyle = "rgba(17, 24, 39, 0.78)";
+    ctx.fillText("คุณอยู่ตรงนี้", px, Math.max(top + 12, py - 18));
+  }
+
+  /**
    * @param {HTMLElement} resultsEl
    * @param {Record<DiscLetter, number>} scores
    * @param {Record<ChoiceLetter, number>} choiceCounts
@@ -482,6 +595,16 @@
         </div>
       </div>
 
+      <div class="nbk-quadrant-card" aria-label="แผนภาพควอดแรนต์ DiSC">
+        <div class="nbk-radar-head">
+          <h4 class="nbk-radar-title">แผนภาพควอดแรนต์ DiSC</h4>
+          <p class="nbk-radar-caption">จุดแสดง “สมดุล” จากคะแนนรวม (คน vs งาน, เร็ว vs ช้า) เพื่อเห็นแนวโน้มโดยรวม</p>
+        </div>
+        <div class="nbk-radar-canvas-wrap">
+          <canvas id="nbk-disc-quadrant" role="img" aria-label="ควอดแรนต์ DiSC"></canvas>
+        </div>
+      </div>
+
       <div class="nbk-radar-card" aria-label="กราฟเรดาร์คะแนนมิติ DISC">
         <div class="nbk-radar-head">
           <h4 class="nbk-radar-title">โปรไฟล์ DISC</h4>
@@ -492,6 +615,11 @@
         </div>
       </div>
     `;
+
+    const quadrantCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-quadrant"));
+    if (quadrantCanvas) {
+      requestAnimationFrame(() => renderDiscQuadrant(quadrantCanvas, scores));
+    }
 
     const radarCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-radar"));
     if (radarCanvas) {
