@@ -327,6 +327,17 @@
       return { nx, ny };
     }
 
+    /** @param {string} s */
+    function hashUnit(s) {
+      // Small deterministic hash -> [0,1)
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return ((h >>> 0) % 10000) / 10000;
+    }
+
     // Quadrant fills (soft)
     ctx.fillStyle = "rgba(37, 99, 235, 0.06)"; // i
     ctx.fillRect(cx, top, right - cx, cy - top);
@@ -376,14 +387,24 @@
     ctx.fillText("🧸 C", left + size * 0.25, top + size * 0.84);
 
     // Points (per submission)
-    ctx.fillStyle = "rgba(37, 99, 235, 0.16)";
+    // Make individuals visible: slightly stronger opacity + tiny jitter to avoid overplotting.
+    ctx.fillStyle = "rgba(37, 99, 235, 0.28)";
+    ctx.strokeStyle = "rgba(37, 99, 235, 0.22)";
+    ctx.lineWidth = 1;
     for (const r of rows) {
       const { nx, ny } = normPoint(r.disc_score_d, r.disc_score_i, r.disc_score_s, r.disc_score_c);
-      const px = cx + (size / 2) * nx;
-      const py = cy - (size / 2) * ny;
+      const px0 = cx + (size / 2) * nx;
+      const py0 = cy - (size / 2) * ny;
+      // +/- 3px deterministic jitter based on timestamp+scores (keeps stable across refreshes).
+      const seed = `${r.submitted_at}|${r.disc_score_d}|${r.disc_score_i}|${r.disc_score_s}|${r.disc_score_c}`;
+      const jx = (hashUnit(seed) - 0.5) * 6;
+      const jy = (hashUnit(seed + "y") - 0.5) * 6;
+      const px = Math.max(left + 2, Math.min(right - 2, px0 + jx));
+      const py = Math.max(top + 2, Math.min(bottom - 2, py0 + jy));
       ctx.beginPath();
-      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.arc(px, py, 3.25, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
     }
 
     // Average point (highlight)
