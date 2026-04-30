@@ -469,12 +469,6 @@
           </div>
         </div>
 
-        <div class="nbk-actions">
-          <button type="button" class="nbk-btn nbk-btn-send" data-action="send">ส่งผล</button>
-          <button type="button" class="nbk-btn" data-action="copy">คัดลอกสรุป</button>
-          <button type="button" class="nbk-btn nbk-btn-ghost" data-action="reset">ล้างคำตอบ</button>
-        </div>
-
         <div class="nbk-note">
           *ผลนี้ใช้เพื่อสะท้อนตนเองและการสื่อสารในทีม ไม่ใช่เครื่องมือเชิงคลินิก
         </div>
@@ -493,6 +487,40 @@
 
     const radarCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-radar"));
     if (radarCanvas) requestAnimationFrame(() => renderDiscRadar(radarCanvas, scores, maxTotal));
+  }
+
+  /**
+   * @param {HTMLElement} mount
+   * @param {() => {scores: Record<DiscLetter, number>, choiceCounts: Record<ChoiceLetter, number>, complete: boolean, totalQuestions: number, pairBlurbs: Record<string, string>, resultSummary: string}} getState
+   */
+  function wireResultsPageActions(mount, getState) {
+    mount.addEventListener("click", async (ev) => {
+      const t = ev.target;
+      if (!(t instanceof HTMLElement)) return;
+      const btn = t.closest("[data-action]");
+      if (!btn) return;
+
+      const action = btn.getAttribute("data-action");
+      if (action === "copy") {
+        const { scores, choiceCounts, totalQuestions, resultSummary } = getState();
+        const text =
+          `DISC (${totalQuestions} ข้อ)\n` +
+          `ตัวเลือก A–D (ดิบ): A=${choiceCounts.A}, B=${choiceCounts.B}, C=${choiceCounts.C}, D=${choiceCounts.D}\n` +
+          `${resultSummary}\n` +
+          `คะแนน DISC: D(กระทิง)=${scores.D}, i(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}\n`;
+        try {
+          await navigator.clipboard.writeText(text);
+          flashStatus(mount, "คัดลอกแล้ว");
+        } catch {
+          window.prompt("คัดลอกข้อความนี้:", text);
+        }
+      }
+
+      if (action === "reset") {
+        clearAnswers();
+        window.location.href = "index.html#survey";
+      }
+    });
   }
 
   /**
@@ -523,9 +551,11 @@
         <div class="nbk-layout">
           <form class="nbk-form" autocomplete="off">
             <div class="nbk-grid" id="nbk-grid"></div>
+            <div class="nbk-bottom-actions" aria-label="การดำเนินการแบบสอบถาม">
+              <button type="button" class="nbk-btn nbk-btn-send" data-action="send">ส่งผล</button>
+              <button type="button" class="nbk-btn nbk-btn-ghost" data-action="reset">ล้างคำตอบ</button>
+            </div>
           </form>
-
-          <div class="nbk-results" id="nbk-results" aria-label="ผลคะแนน DISC"></div>
         </div>
       </div>
     `;
@@ -534,7 +564,6 @@
 
     const header = sheet.querySelector(".nbk-header");
     const grid = /** @type {HTMLElement} */ (sheet.querySelector("#nbk-grid"));
-    const resultsEl = /** @type {HTMLElement} */ (sheet.querySelector("#nbk-results"));
 
     const progress = buildProgressDots(sheet, items.length);
     header?.appendChild(progress);
@@ -620,19 +649,10 @@
     }
 
     function update() {
-      const scores = calcScores();
-      renderResults(
-        resultsEl,
-        scores,
-        calcChoiceCounts(answers, items.length),
-        items.length,
-        isComplete(),
-        pairBlurbs
-      );
       updateDots();
     }
 
-    // Actions (send/copy/reset)
+    // Actions (send/reset)
     quizMount.addEventListener("click", async (ev) => {
       const t = ev.target;
       if (!(t instanceof HTMLElement)) return;
@@ -648,34 +668,6 @@
           /** @type {HTMLInputElement} */ (input).checked = false;
         }
         update();
-      }
-
-      if (action === "copy") {
-        const scores = calcScores();
-        const choiceCounts = calcChoiceCounts(answers, items.length);
-        const { top: topDisc } = topStyles(scores);
-        const topProfiles = topDisc.map((d) => profileForDisc(d));
-        const topText = topDisc.length === 1
-          ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
-          : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
-        const text =
-          `DISC (${items.length} ข้อ)
-` +
-          `ตัวเลือก A–D (ดิบ): A=${choiceCounts.A}, B=${choiceCounts.B}, C=${choiceCounts.C}, D=${choiceCounts.D}
-` +
-          `${topText}
-` +
-          `คะแนน DISC: D(กระทิง)=${scores.D}, i(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}
-`;
-
-
-        try {
-          await navigator.clipboard.writeText(text);
-          flashStatus(resultsEl, "คัดลอกแล้ว");
-        } catch {
-          // Fallback: prompt
-          window.prompt("คัดลอกข้อความนี้:", text);
-        }
       }
 
       if (action === "send") {
@@ -712,8 +704,7 @@
             flashStatus(resultsEl, "ส่งผลไม่สำเร็จ โปรดลองอีกครั้ง");
           }
         }
-
-        window.open("https://www.menti.com/alozdhwzj9id?source=qr-page", "_blank", "noopener,noreferrer");
+        window.location.href = "result.html";
       }
     });
 
@@ -750,21 +741,74 @@
     document.documentElement.classList.add("js");
 
     const mount = document.getElementById("disc-quiz");
-    if (!mount) return;
+    if (mount) {
+      const ol = document.querySelector("#survey .questionnaire");
+      if (!(ol instanceof HTMLOListElement)) {
+        mount.innerHTML = `<div class="card"><p>ไม่พบรายการคำถาม (questionnaire) ในหน้าเว็บ</p></div>`;
+        return;
+      }
 
-    const ol = document.querySelector("#survey .questionnaire");
-    if (!(ol instanceof HTMLOListElement)) {
-      mount.innerHTML = `<div class="card"><p>ไม่พบรายการคำถาม (questionnaire) ในหน้าเว็บ</p></div>`;
-      return;
+      const items = parseQuestionnaire(ol);
+      if (!items.length) {
+        mount.innerHTML = `<div class="card"><p>อ่านคำถามไม่สำเร็จ โปรดตรวจรูปแบบ HTML ของแบบสอบถาม</p></div>`;
+        return;
+      }
+
+      buildQuizUI(mount, items);
     }
 
-    const items = parseQuestionnaire(ol);
-    if (!items.length) {
-      mount.innerHTML = `<div class="card"><p>อ่านคำถามไม่สำเร็จ โปรดตรวจรูปแบบ HTML ของแบบสอบถาม</p></div>`;
-      return;
-    }
+    const resultsPage = document.getElementById("disc-results-page");
+    if (resultsPage) {
+      const pairBlurbs = readPairBlurbs();
+      const answers = loadAnswers();
+      const totalQuestions = QUESTION_SCORING.length;
 
-    buildQuizUI(mount, items);
+      /** @type {Record<DiscLetter, number>} */
+      const scores = { D: 0, i: 0, S: 0, C: 0 };
+      for (let q = 1; q <= totalQuestions; q++) {
+        const choice = answers[`q${q}`];
+        if (!choice) continue;
+        const discByQuestion = QUESTION_SCORING[q - 1];
+        const disc = discByQuestion ? discByQuestion[choice] : CHOICE_TO_DISC[choice];
+        scores[disc] += 1;
+      }
+
+      const choiceCounts = calcChoiceCounts(answers, totalQuestions);
+      const complete = (() => {
+        for (let q = 1; q <= totalQuestions; q++) {
+          if (!answers[`q${q}`]) return false;
+        }
+        return true;
+      })();
+
+      const { top: topDisc } = topStyles(scores);
+      const topProfiles = topDisc.map((d) => profileForDisc(d));
+      const resultSummary =
+        topDisc.length === 1
+          ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
+          : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
+
+      renderResults(resultsPage, scores, choiceCounts, totalQuestions, complete, pairBlurbs);
+      resultsPage.insertAdjacentHTML(
+        "afterbegin",
+        `<div class="nbk-page-actions">
+          <a class="nbk-btn nbk-btn-ghost" href="index.html#survey">กลับไปทำแบบสอบถาม</a>
+          <button type="button" class="nbk-btn" data-action="copy">คัดลอกสรุป</button>
+          <button type="button" class="nbk-btn nbk-btn-ghost" data-action="reset">ล้างคำตอบ</button>
+        </div>`
+      );
+      wireResultsPageActions(resultsPage, () => ({
+        scores,
+        choiceCounts,
+        complete,
+        totalQuestions,
+        pairBlurbs,
+        resultSummary,
+      }));
+      if (!complete) {
+        flashStatus(resultsPage, "ยังตอบไม่ครบ — กลับไปทำแบบสอบถามได้");
+      }
+    }
   }
 
   if (document.readyState === "loading") {
