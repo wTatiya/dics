@@ -183,7 +183,7 @@
   function topStyles(row) {
     const scores = [
       ["D", row.disc_score_d],
-      ["I", row.disc_score_i],
+      ["i", row.disc_score_i],
       ["S", row.disc_score_s],
       ["C", row.disc_score_c],
     ];
@@ -192,15 +192,15 @@
   }
 
   /**
-   * Top-2 pair key, similar to the quiz UI logic.
-   * If the 2nd place is tied (ambiguous), returns "tie".
+   * Top-2 pair label for admin aggregation.
+   * If tied/ambiguous, returns key "tie" with a descriptive label (so users can see which ones).
    * @param {SubmissionRow} row
-   * @returns {string} e.g. "D/I", "S/C", or "tie"
+   * @returns {{ key: string, label: string }} e.g. {key:"D/i", label:"D/i"} or {key:"tie", label:"D/(i,S)"}
    */
   function top2Pair(row) {
     const scores = [
       ["D", row.disc_score_d],
-      ["I", row.disc_score_i],
+      ["i", row.disc_score_i],
       ["S", row.disc_score_s],
       ["C", row.disc_score_c],
     ];
@@ -208,13 +208,28 @@
 
     const first = scores[0];
     const second = scores[1];
-    if (!first || !second) return "tie";
+    if (!first || !second) return { key: "tie", label: "เสมอ" };
+
+    // If top is tied among multiple dimensions, show which ones are tied.
+    const topScore = first[1];
+    const topTies = scores.filter(([, v]) => v === topScore).map(([k]) => k);
+    if (topTies.length > 1) {
+      return { key: "tie", label: `เสมอ(${topTies.join("/")})` };
+    }
 
     // If 2nd place score equals 3rd place score, the Top-2 pair is not unique.
     const third = scores[2];
-    if (third && second[1] === third[1]) return "tie";
+    if (third && second[1] === third[1]) {
+      const secondScore = second[1];
+      const tiedSeconds = scores
+        .slice(1)
+        .filter(([, v]) => v === secondScore)
+        .map(([k]) => k);
+      return { key: "tie", label: `${first[0]}/(${tiedSeconds.join(",")})` };
+    }
 
-    return `${first[0]}/${second[0]}`;
+    const pair = `${first[0]}/${second[0]}`;
+    return { key: pair, label: pair };
   }
 
   /** @param {SubmissionRow[]} rows */
@@ -232,7 +247,7 @@
     );
 
     /** @type {Record<string, number>} */
-    const topCount = { D: 0, I: 0, S: 0, C: 0, tie: 0 };
+    const topCount = { D: 0, i: 0, S: 0, C: 0, tie: 0 };
     /** @type {Record<string, number>} */
     const pairCount = { tie: 0 };
     for (const r of rows) {
@@ -241,7 +256,7 @@
       else topCount[tops[0]] += 1;
 
       const pair = top2Pair(r);
-      pairCount[pair] = (pairCount[pair] || 0) + 1;
+      pairCount[pair.key] = (pairCount[pair.key] || 0) + 1;
     }
 
     return {
@@ -386,34 +401,53 @@
     const topHtml = `
       <div class="admin-kpi-grid">
         <div class="admin-kpi"><div class="k">เด่น D</div><div class="v">${top.D}</div></div>
-        <div class="admin-kpi"><div class="k">เด่น I</div><div class="v">${top.I}</div></div>
+        <div class="admin-kpi"><div class="k">เด่น i</div><div class="v">${top.i}</div></div>
         <div class="admin-kpi"><div class="k">เด่น S</div><div class="v">${top.S}</div></div>
         <div class="admin-kpi"><div class="k">เด่น C</div><div class="v">${top.C}</div></div>
         <div class="admin-kpi"><div class="k">เสมอ</div><div class="v">${top.tie}</div></div>
       </div>
     `;
 
-    const pairEntries = Object.entries(agg.pairCount || {})
-      .map(([k, v]) => [String(k), Number(v || 0)])
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1]);
-
-    const pairHtml = pairEntries.length
-      ? `
-        <div class="pill-grid">
-          ${pairEntries
-            .map(([k, v]) => {
-              const label = k === "tie" ? "เสมอ" : k;
-              return `<span class="pill">${escapeHtml(label)}: ${v}</span>`;
-            })
-            .join("")}
-        </div>
-      `
-      : `<div class="muted">ไม่มีข้อมูล</div>`;
-
     const sorted = rows
       .slice()
       .sort((a, b) => (a.submitted_at < b.submitted_at ? 1 : -1));
+
+    /** @type {Record<string, { count: number, examples: string[] }>} */
+    const pairRank = {};
+    for (const r of sorted) {
+      const p = top2Pair(r);
+      const key = p.label || "เสมอ";
+      (pairRank[key] ||= { count: 0, examples: [] }).count += 1;
+      const ex = `${timeLabel(tz, r.submitted_at)} — ${p.label}`;
+      if (pairRank[key].examples.length < 3) pairRank[key].examples.push(ex);
+    }
+
+    const pairRankEntries = Object.entries(pairRank)
+      .map(([k, v]) => [k, v.count, v.examples] )
+      .sort((a, b) => /** @type {any} */ (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
+
+    const pairHtml = pairRankEntries.length
+      ? `
+        <ol class="admin-pair-rank">
+          ${pairRankEntries
+            .map(([label, count, examples]) => {
+              const exHtml = (examples || [])
+                .map((s) => `<li class="mono muted">${escapeHtml(String(s))}</li>`)
+                .join("");
+              return `
+                <li class="admin-pair-item">
+                  <div class="admin-pair-head">
+                    <div class="admin-pair-label mono">${escapeHtml(String(label))}</div>
+                    <div class="admin-pair-count">${count}</div>
+                  </div>
+                  ${exHtml ? `<ul class="admin-pair-examples">${exHtml}</ul>` : ""}
+                </li>
+              `;
+            })
+            .join("")}
+        </ol>
+      `
+      : `<div class="muted">ไม่มีข้อมูล</div>`;
 
     const tableRows = sorted
       .map((r) => {
