@@ -517,6 +517,7 @@
             <p class="muted">คลิกวันที่เพื่อดูสรุป/วิเคราะห์ของกลุ่มนั้น</p>
           </div>
           <div class="admin-actions">
+            <a class="nbk-btn nbk-btn-ghost" href="index.html#survey">กลับไปทำแบบสอบถาม</a>
             <button type="button" class="nbk-btn nbk-btn-ghost" data-action="logout">ออกจากระบบ</button>
           </div>
         </div>
@@ -628,6 +629,7 @@
             <p class="muted">${rows.length} รายการ</p>
           </div>
           <div class="admin-actions">
+            <a class="nbk-btn nbk-btn-ghost" href="index.html#survey">กลับไปทำแบบสอบถาม</a>
             <button type="button" class="nbk-btn" data-action="back">ย้อนกลับ</button>
             <button type="button" class="nbk-btn nbk-btn-ghost" data-action="logout">ออกจากระบบ</button>
           </div>

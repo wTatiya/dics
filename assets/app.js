@@ -699,9 +699,9 @@
           };
           const sent = await submitFn(row);
           if (sent.ok) {
-            flashStatus(resultsEl, "ส่งผลให้ผู้ดูแลระบบแล้ว");
+            flashStatus(sheet, "ส่งผลให้ผู้ดูแลระบบแล้ว");
           } else if (sent.error !== "not_configured") {
-            flashStatus(resultsEl, "ส่งผลไม่สำเร็จ โปรดลองอีกครั้ง");
+            flashStatus(sheet, "ส่งผลไม่สำเร็จ โปรดลองอีกครั้ง");
           }
         }
         window.location.href = "result.html";
