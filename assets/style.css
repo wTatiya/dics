@@ -397,19 +397,6 @@ thead {
   padding-right: 0.5rem;
 }
 
-@media (min-width: 921px) {
-  .disc-quiz .nbk-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-    align-items: start;
-  }
-
-  .disc-quiz .nbk-results {
-    position: sticky;
-    top: 1rem;
-    align-self: start;
-  }
-}
-
 @media (max-width: 920px) {
   .disc-quiz .nbk-layout {
     grid-template-columns: 1fr;

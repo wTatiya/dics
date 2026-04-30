@@ -14,30 +14,28 @@
   });
 
   const QUESTION_SCORING = /** @type {const} */ ([
-    { A: "C", B: "i", C: "D", D: "S" },
-    { A: "C", B: "S", C: "D", D: "i" },
-    { A: "S", B: "C", C: "D", D: "i" },
-    { A: "i", B: "C", C: "D", D: "S" },
-    { A: "i", B: "D", C: "C", D: "S" },
-    { A: "S", B: "C", C: "D", D: "i" },
-    { A: "i", B: "C", C: "D", D: "S" },
-    { A: "C", B: "i", C: "D", D: "S" },
-    { A: "i", B: "S", C: "D", D: "C" },
-    { A: "C", B: "S", C: "D", D: "i" },
-    { A: "S", B: "C", C: "i", D: "D" },
-    { A: "C", B: "S", C: "D", D: "i" },
-    { A: "S", B: "C", C: "i", D: "D" },
-    { A: "C", B: "i", C: "S", D: "D" },
-    { A: "S", B: "C", C: "D", D: "i" },
-    { A: "S", B: "C", C: "i", D: "D" },
-    { A: "C", B: "S", C: "D", D: "i" },
-    { A: "C", B: "D", C: "i", D: "S" },
-    { A: "C", B: "S", C: "i", D: "D" },
-    { A: "C", B: "S", C: "i", D: "D" },
-    { A: "i", B: "D", C: "C", D: "S" },
-    { A: "S", B: "C", C: "i", D: "D" },
-    { A: "C", B: "S", C: "i", D: "D" },
-    { A: "C", B: "S", C: "i", D: "D" },
+    // Answer key (21 questions): map choice A/B/C/D -> DISC D/i/S/C
+    { A: "D", B: "C", C: "S", D: "i" }, // 1
+    { A: "C", B: "D", C: "i", D: "S" }, // 2
+    { A: "D", B: "C", C: "i", D: "S" }, // 3
+    { A: "C", B: "D", C: "i", D: "S" }, // 4
+    { A: "C", B: "D", C: "i", D: "S" }, // 5
+    { A: "D", B: "C", C: "i", D: "S" }, // 6
+    { A: "C", B: "D", C: "i", D: "S" }, // 7
+    { A: "D", B: "C", C: "i", D: "S" }, // 8
+    { A: "C", B: "D", C: "i", D: "S" }, // 9
+    { A: "C", B: "D", C: "i", D: "S" }, // 10
+    { A: "D", B: "C", C: "i", D: "S" }, // 11
+    { A: "D", B: "C", C: "i", D: "S" }, // 12
+    { A: "S", B: "D", C: "C", D: "i" }, // 13
+    { A: "D", B: "C", C: "i", D: "S" }, // 14
+    { A: "D", B: "C", C: "i", D: "S" }, // 15
+    { A: "D", B: "C", C: "i", D: "S" }, // 16
+    { A: "D", B: "C", C: "i", D: "S" }, // 17
+    { A: "D", B: "C", C: "i", D: "S" }, // 18
+    { A: "D", B: "C", C: "i", D: "S" }, // 19
+    { A: "D", B: "C", C: "i", D: "S" }, // 20
+    { A: "D", B: "C", C: "i", D: "S" }, // 21
   ]);
 
   const CHOICE_PROFILE_MAP = /** @type {const} */ ({
@@ -304,18 +302,13 @@
     return counts;
   }
 
-  /** Max points per DISC dimension (one dimension per answered question). */
-  const DISC_RADAR_MAX = 24;
-
-  /** Max range for 2-axis quadrant model using sums of two dimensions. */
-  const DISC_QUADRANT_AXIS_MAX = 48;
-
   /**
-   * Draw a 4-axis radar for D / i / S / C scores (0–24 each).
+   * Draw a 4-axis radar for D / i / S / C scores (0–max each).
    * @param {HTMLCanvasElement} canvas
    * @param {Record<DiscLetter, number>} scores
+   * @param {number} maxScore
    */
-  function renderDiscRadar(canvas, scores) {
+  function renderDiscRadar(canvas, scores, maxScore) {
     const W = 360;
     const H = 400;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -381,7 +374,8 @@
 
     // Data polygon
     const fillPts = values.map((v, i) => {
-      const t = Math.min(Math.max(v / DISC_RADAR_MAX, 0), 1);
+      const denom = maxScore || 1;
+      const t = Math.min(Math.max(v / denom, 0), 1);
       return pointAt(angles[i], radius * t);
     });
 
@@ -422,116 +416,6 @@
   }
 
   /**
-   * DiSC quadrant visualization.
-   * Axes (heuristic, Thai-friendly):
-   * - X: "คน (i+S)"  vs  "งาน (D+C)"  → People (+) / Task (-)
-   * - Y: "เร็ว (D+i)" vs  "ช้า (S+C)" → Fast (+) / Slow (-)
-   * Point shows the balance/ratio across dimensions (not a clinical measure).
-   * @param {HTMLCanvasElement} canvas
-   * @param {Record<DiscLetter, number>} scores
-   */
-  function renderDiscQuadrant(canvas, scores) {
-    const W = 360;
-    const H = 360;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
-    canvas.style.width = `${W}px`;
-    canvas.style.height = `${H}px`;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, W, H);
-
-    const cx = W / 2;
-    const cy = H / 2;
-    const pad = 44;
-    const size = Math.min(W, H) - pad * 2;
-    const left = (W - size) / 2;
-    const top = (H - size) / 2;
-    const right = left + size;
-    const bottom = top + size;
-
-    // Normalize axes to [-1..1]
-    const peopleVsTask = (scores.i + scores.S) - (scores.D + scores.C);
-    const fastVsSlow = (scores.D + scores.i) - (scores.S + scores.C);
-    const nx = Math.max(-1, Math.min(1, peopleVsTask / DISC_QUADRANT_AXIS_MAX));
-    const ny = Math.max(-1, Math.min(1, fastVsSlow / DISC_QUADRANT_AXIS_MAX));
-
-    // Quadrant fills (very soft)
-    ctx.fillStyle = "rgba(37, 99, 235, 0.06)"; // i (people+fast)
-    ctx.fillRect(cx, top, right - cx, cy - top);
-    ctx.fillStyle = "rgba(34, 197, 94, 0.06)"; // S (people+slow)
-    ctx.fillRect(cx, cy, right - cx, bottom - cy);
-    ctx.fillStyle = "rgba(245, 158, 11, 0.06)"; // D (task+fast)
-    ctx.fillRect(left, top, cx - left, cy - top);
-    ctx.fillStyle = "rgba(148, 163, 184, 0.14)"; // C (task+slow)
-    ctx.fillRect(left, cy, cx - left, bottom - cy);
-
-    // Frame + axes
-    ctx.strokeStyle = "rgba(17, 24, 39, 0.18)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(left, top, size, size);
-
-    ctx.strokeStyle = "rgba(17, 24, 39, 0.18)";
-    ctx.beginPath();
-    ctx.moveTo(cx, top);
-    ctx.lineTo(cx, bottom);
-    ctx.moveTo(left, cy);
-    ctx.lineTo(right, cy);
-    ctx.stroke();
-
-    // Labels
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = '800 14px "Noto Sans Thai", system-ui, sans-serif';
-    ctx.fillStyle = "rgba(17, 24, 39, 0.88)";
-    ctx.fillText("เร็ว", cx, top - 18);
-    ctx.fillText("ช้า", cx, bottom + 18);
-
-    ctx.save();
-    ctx.translate(left - 18, cy);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText("งาน", 0, 0);
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(right + 18, cy);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText("คน", 0, 0);
-    ctx.restore();
-
-    // Quadrant titles
-    ctx.font = '800 13px "Noto Sans Thai", system-ui, sans-serif';
-    ctx.fillStyle = "rgba(17, 24, 39, 0.92)";
-    ctx.fillText("🐂 D", left + size * 0.25, top + size * 0.18);
-    ctx.fillText("🦅 i", left + size * 0.75, top + size * 0.18);
-    ctx.fillText("🐭 S", left + size * 0.75, top + size * 0.82);
-    ctx.fillText("🧸 C", left + size * 0.25, top + size * 0.82);
-
-    // Plot point
-    const px = cx + (size / 2) * nx;
-    const py = cy - (size / 2) * ny;
-
-    // Shadow ring
-    ctx.fillStyle = "rgba(37, 99, 235, 0.18)";
-    ctx.beginPath();
-    ctx.arc(px, py, 10.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "rgba(37, 99, 235, 0.95)";
-    ctx.beginPath();
-    ctx.arc(px, py, 5.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Annotation
-    ctx.font = '700 12px "Noto Sans Thai", system-ui, sans-serif';
-    ctx.fillStyle = "rgba(17, 24, 39, 0.78)";
-    ctx.fillText("คุณอยู่ตรงนี้", px, Math.max(top + 12, py - 18));
-  }
-
-  /**
    * @param {HTMLElement} resultsEl
    * @param {Record<DiscLetter, number>} scores
    * @param {Record<ChoiceLetter, number>} choiceCounts
@@ -544,9 +428,8 @@
    * @param {boolean} complete
    * @param {Record<string, string>} pairBlurbs
    */
-  function renderResults(resultsEl, scores, choiceCounts, complete, pairBlurbs) {
+  function renderResults(resultsEl, scores, choiceCounts, totalQuestions, complete, pairBlurbs) {
     const { top: topDisc, top2 } = topStyles(scores);
-    const choiceTotal = choiceCounts.A + choiceCounts.B + choiceCounts.C + choiceCounts.D;
     const topProfiles = topDisc.map((d) => profileForDisc(d));
     const topLabel = topDisc.length === 1
       ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
@@ -556,12 +439,14 @@
     const pairKey = `${top2[0]}/${top2[1]}`;
     const pairHtml = pairBlurbs[pairKey];
 
+    const total = choiceCounts.A + choiceCounts.B + choiceCounts.C + choiceCounts.D;
+    const maxTotal = totalQuestions;
     resultsEl.innerHTML = `
       <div class="nbk-card">
         <div class="nbk-card-head">
           <h4>สรุปผล</h4>
           <div class="nbk-status ${complete ? "is-complete" : ""}">
-            ${complete ? "ครบแล้ว" : "ตอบให้ครบ 24 ข้อ"}
+            ${complete ? "ครบแล้ว" : `ตอบให้ครบ ${maxTotal} ข้อ`}
           </div>
         </div>
 
@@ -574,7 +459,7 @@
 
         <div class="nbk-meta">
           ${topSubtitle ? `<div class="nbk-meta-line">${topSubtitle}</div>` : ""}
-          <div class="nbk-meta-line">จำนวนข้อที่ตอบแล้ว: ${choiceTotal}/24</div>
+          <div class="nbk-meta-line">จำนวนข้อที่ตอบแล้ว: ${total}/${maxTotal}</div>
         </div>
 
         <div class="nbk-explain">
@@ -595,20 +480,10 @@
         </div>
       </div>
 
-      <div class="nbk-quadrant-card" aria-label="แผนภาพควอดแรนต์ DiSC">
-        <div class="nbk-radar-head">
-          <h4 class="nbk-radar-title">แผนภาพควอดแรนต์ DiSC</h4>
-          <p class="nbk-radar-caption">จุดแสดง “สมดุล” จากคะแนนรวม (คน vs งาน, เร็ว vs ช้า) เพื่อเห็นแนวโน้มโดยรวม</p>
-        </div>
-        <div class="nbk-radar-canvas-wrap">
-          <canvas id="nbk-disc-quadrant" role="img" aria-label="ควอดแรนต์ DiSC"></canvas>
-        </div>
-      </div>
-
       <div class="nbk-radar-card" aria-label="กราฟเรดาร์คะแนนมิติ DISC">
         <div class="nbk-radar-head">
           <h4 class="nbk-radar-title">โปรไฟล์ DISC</h4>
-          <p class="nbk-radar-caption">เปรียบเทียบ 4 มิติจากคำตอบที่มีอยู่ (สเกลข้อละ 1 คะแนน สูงสุด ${DISC_RADAR_MAX} ต่อมิติ)</p>
+          <p class="nbk-radar-caption">เปรียบเทียบ 4 มิติจากคำตอบที่มีอยู่ (สเกลข้อละ 1 คะแนน สูงสุด ${maxTotal} ต่อมิติ)</p>
         </div>
         <div class="nbk-radar-canvas-wrap">
           <canvas id="nbk-disc-radar" role="img" aria-label="เรดาร์ D I S C"></canvas>
@@ -616,15 +491,8 @@
       </div>
     `;
 
-    const quadrantCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-quadrant"));
-    if (quadrantCanvas) {
-      requestAnimationFrame(() => renderDiscQuadrant(quadrantCanvas, scores));
-    }
-
     const radarCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-radar"));
-    if (radarCanvas) {
-      requestAnimationFrame(() => renderDiscRadar(radarCanvas, scores));
-    }
+    if (radarCanvas) requestAnimationFrame(() => renderDiscRadar(radarCanvas, scores, maxTotal));
   }
 
   /**
@@ -646,7 +514,7 @@
           <div class="nbk-title">
             <div class="nbk-badge">DISC</div>
             <div>
-              <div class="nbk-title-main">แบบสอบถาม 24 ข้อ</div>
+              <div class="nbk-title-main">แบบสอบถาม ${items.length} ข้อ</div>
               <div class="nbk-title-sub">เลือก 1 ตัวเลือกต่อข้อ • ระบบจะคำนวณอัตโนมัติ</div>
             </div>
           </div>
@@ -753,7 +621,14 @@
 
     function update() {
       const scores = calcScores();
-      renderResults(resultsEl, scores, calcChoiceCounts(answers, items.length), isComplete(), pairBlurbs);
+      renderResults(
+        resultsEl,
+        scores,
+        calcChoiceCounts(answers, items.length),
+        items.length,
+        isComplete(),
+        pairBlurbs
+      );
       updateDots();
     }
 
@@ -784,7 +659,7 @@
           ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
           : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
         const text =
-          `DISC (24 ข้อ)
+          `DISC (${items.length} ข้อ)
 ` +
           `ตัวเลือก A–D (ดิบ): A=${choiceCounts.A}, B=${choiceCounts.B}, C=${choiceCounts.C}, D=${choiceCounts.D}
 ` +
