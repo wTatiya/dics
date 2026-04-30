@@ -172,6 +172,32 @@
     return scores.filter(([, v]) => v === max).map(([k]) => k);
   }
 
+  /**
+   * Top-2 pair key, similar to the quiz UI logic.
+   * If the 2nd place is tied (ambiguous), returns "tie".
+   * @param {SubmissionRow} row
+   * @returns {string} e.g. "D/I", "S/C", or "tie"
+   */
+  function top2Pair(row) {
+    const scores = [
+      ["D", row.disc_score_d],
+      ["I", row.disc_score_i],
+      ["S", row.disc_score_s],
+      ["C", row.disc_score_c],
+    ];
+    scores.sort((a, b) => b[1] - a[1]);
+
+    const first = scores[0];
+    const second = scores[1];
+    if (!first || !second) return "tie";
+
+    // If 2nd place score equals 3rd place score, the Top-2 pair is not unique.
+    const third = scores[2];
+    if (third && second[1] === third[1]) return "tie";
+
+    return `${first[0]}/${second[0]}`;
+  }
+
   /** @param {SubmissionRow[]} rows */
   function aggregate(rows) {
     const n = rows.length || 1;
@@ -188,10 +214,15 @@
 
     /** @type {Record<string, number>} */
     const topCount = { D: 0, I: 0, S: 0, C: 0, tie: 0 };
+    /** @type {Record<string, number>} */
+    const pairCount = { tie: 0 };
     for (const r of rows) {
       const tops = topStyles(r);
       if (tops.length !== 1) topCount.tie += 1;
       else topCount[tops[0]] += 1;
+
+      const pair = top2Pair(r);
+      pairCount[pair] = (pairCount[pair] || 0) + 1;
     }
 
     return {
@@ -203,6 +234,7 @@
         c: sum.c / n,
       },
       topCount,
+      pairCount,
     };
   }
 
@@ -342,31 +374,35 @@
       </div>
     `;
 
+    const pairEntries = Object.entries(agg.pairCount || {})
+      .map(([k, v]) => [String(k), Number(v || 0)])
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    const pairHtml = pairEntries.length
+      ? `
+        <div class="pill-grid">
+          ${pairEntries
+            .map(([k, v]) => {
+              const label = k === "tie" ? "เสมอ" : k;
+              return `<span class="pill">${escapeHtml(label)}: ${v}</span>`;
+            })
+            .join("")}
+        </div>
+      `
+      : `<div class="muted">ไม่มีข้อมูล</div>`;
+
     const sorted = rows
       .slice()
       .sort((a, b) => (a.submitted_at < b.submitted_at ? 1 : -1));
 
     const tableRows = sorted
       .map((r) => {
-        const jsonRaw = String(r.answers_json || "");
-        const jsonTrim = jsonRaw.trim();
-        const jsonShort =
-          jsonTrim.length > 220 ? `${jsonTrim.slice(0, 220)}…` : jsonTrim;
         return `
           <tr>
             <td class="mono">${escapeHtml(timeLabel(tz, r.submitted_at))}</td>
             <td>${escapeHtml(r.result_summary || "")}</td>
             <td class="mono">D ${r.disc_score_d} / I ${r.disc_score_i} / S ${r.disc_score_s} / C ${r.disc_score_c}</td>
-            <td class="mono admin-json">
-              ${
-                jsonTrim
-                  ? `<details class="admin-json-details">
-                      <summary class="admin-json-summary">${escapeHtml(jsonShort)}</summary>
-                      <pre class="admin-json-pre">${escapeHtml(jsonTrim)}</pre>
-                    </details>`
-                  : `<span class="muted">—</span>`
-              }
-            </td>
           </tr>
         `;
       })
@@ -385,18 +421,14 @@
           </div>
         </div>
 
-        <div class="admin-summary">
-          <div class="admin-kpi-grid">
-            <div class="admin-kpi"><div class="k">เฉลี่ย D</div><div class="v">${avg.d.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">เฉลี่ย I</div><div class="v">${avg.i.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">เฉลี่ย S</div><div class="v">${avg.s.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">เฉลี่ย C</div><div class="v">${avg.c.toFixed(2)}</div></div>
-            <div class="admin-kpi"><div class="k">จำนวน</div><div class="v">${agg.count}</div></div>
-          </div>
-          <div class="admin-block">
-            <div class="admin-block-title">สัดส่วนสไตล์เด่น</div>
-            ${topHtml}
-          </div>
+        <div class="admin-block">
+          <div class="admin-block-title">จำนวนผู้ได้แต่ละสไตล์</div>
+          ${topHtml}
+        </div>
+
+        <div class="admin-block">
+          <div class="admin-block-title">จำนวนผู้ได้แต่ละคู่สไตล์</div>
+          ${pairHtml}
         </div>
 
         <div class="admin-block">
@@ -411,11 +443,10 @@
                   <th>เวลา</th>
                   <th>ผลลัพธ์</th>
                   <th>คะแนน</th>
-                  <th>answers_json</th>
                 </tr>
               </thead>
               <tbody>
-                ${tableRows || `<tr><td colspan="4" class="muted">ไม่มีข้อมูล</td></tr>`}
+                ${tableRows || `<tr><td colspan="3" class="muted">ไม่มีข้อมูล</td></tr>`}
               </tbody>
             </table>
           </div>
