@@ -48,7 +48,7 @@
     },
     B: {
       emoji: "🦅",
-      title: 'คุณคือ "อินทรี" (สไตล์ I)',
+      title: 'คุณคือ "อินทรี" (สไตล์ i)',
       subtitle: "(นักวิสัยทัศน์ ผู้สร้างแรงบันดาลใจ / Influence)",
     },
     C: {
@@ -311,7 +311,7 @@
   const DISC_QUADRANT_AXIS_MAX = 48;
 
   /**
-   * Draw a 4-axis radar for D / I / S / C scores (0–24 each).
+   * Draw a 4-axis radar for D / i / S / C scores (0–24 each).
    * @param {HTMLCanvasElement} canvas
    * @param {Record<DiscLetter, number>} scores
    */
@@ -506,7 +506,7 @@
     ctx.font = '800 13px "Noto Sans Thai", system-ui, sans-serif';
     ctx.fillStyle = "rgba(17, 24, 39, 0.92)";
     ctx.fillText("🐂 D", left + size * 0.25, top + size * 0.18);
-    ctx.fillText("🦅 I", left + size * 0.75, top + size * 0.18);
+    ctx.fillText("🦅 i", left + size * 0.75, top + size * 0.18);
     ctx.fillText("🐭 S", left + size * 0.75, top + size * 0.82);
     ctx.fillText("🧸 C", left + size * 0.25, top + size * 0.82);
 
@@ -567,7 +567,7 @@
 
         <div class="nbk-scores" role="list" aria-label="คะแนนมิติ DISC (D I S C)">
           <div class="nbk-score" role="listitem"><span class="k">🐂 D(กระทิง)</span><span class="v">${scores.D}</span></div>
-          <div class="nbk-score" role="listitem"><span class="k">🦅 I(อินทรี)</span><span class="v">${scores.i}</span></div>
+          <div class="nbk-score" role="listitem"><span class="k">🦅 i(อินทรี)</span><span class="v">${scores.i}</span></div>
           <div class="nbk-score" role="listitem"><span class="k">🐭 S(หนู)</span><span class="v">${scores.S}</span></div>
           <div class="nbk-score" role="listitem"><span class="k">🧸 C(หมี)</span><span class="v">${scores.C}</span></div>
         </div>
@@ -790,7 +790,7 @@
 ` +
           `${topText}
 ` +
-          `คะแนน DISC: D(กระทิง)=${scores.D}, I(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}
+          `คะแนน DISC: D(กระทิง)=${scores.D}, i(อินทรี)=${scores.i}, S(หนู)=${scores.S}, C(หมี)=${scores.C}
 `;
 
 
