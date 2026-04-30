@@ -940,6 +940,25 @@ thead {
   font-weight: 800;
 }
 
+.admin-quadrant-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 1rem;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92), rgba(239, 246, 255, 0.55));
+  padding: 0.65rem;
+  margin-top: 0.55rem;
+}
+
+.admin-quadrant-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .admin-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

@@ -281,6 +281,140 @@
     setTimeout(() => t.remove(), 1400);
   }
 
+  /** Max range for 2-axis quadrant model using sums of two dimensions. */
+  const DISC_QUADRANT_AXIS_MAX = 48;
+
+  /**
+   * Admin quadrant visualization.
+   * - X: คน (i+S) vs งาน (D+C)
+   * - Y: เร็ว (D+i) vs ช้า (S+C)
+   * Renders per-submission points (faint) + average point (highlight).
+   * @param {HTMLCanvasElement} canvas
+   * @param {SubmissionRow[]} rows
+   */
+  function renderAdminQuadrant(canvas, rows) {
+    const W = 420;
+    const H = 420;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = `${W}px`;
+    canvas.style.height = `${H}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const pad = 54;
+    const size = Math.min(W, H) - pad * 2;
+    const left = (W - size) / 2;
+    const top = (H - size) / 2;
+    const right = left + size;
+    const bottom = top + size;
+
+    function normPoint(d, i, s, c) {
+      const peopleVsTask = (i + s) - (d + c);
+      const fastVsSlow = (d + i) - (s + c);
+      const nx = Math.max(-1, Math.min(1, peopleVsTask / DISC_QUADRANT_AXIS_MAX));
+      const ny = Math.max(-1, Math.min(1, fastVsSlow / DISC_QUADRANT_AXIS_MAX));
+      return { nx, ny };
+    }
+
+    // Quadrant fills (soft)
+    ctx.fillStyle = "rgba(37, 99, 235, 0.06)"; // i
+    ctx.fillRect(cx, top, right - cx, cy - top);
+    ctx.fillStyle = "rgba(34, 197, 94, 0.06)"; // S
+    ctx.fillRect(cx, cy, right - cx, bottom - cy);
+    ctx.fillStyle = "rgba(245, 158, 11, 0.06)"; // D
+    ctx.fillRect(left, top, cx - left, cy - top);
+    ctx.fillStyle = "rgba(148, 163, 184, 0.14)"; // C
+    ctx.fillRect(left, cy, cx - left, bottom - cy);
+
+    // Frame + axes
+    ctx.strokeStyle = "rgba(17, 24, 39, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(left, top, size, size);
+    ctx.beginPath();
+    ctx.moveTo(cx, top);
+    ctx.lineTo(cx, bottom);
+    ctx.moveTo(left, cy);
+    ctx.lineTo(right, cy);
+    ctx.stroke();
+
+    // Labels
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = '800 14px "Noto Sans Thai", system-ui, sans-serif';
+    ctx.fillStyle = "rgba(17, 24, 39, 0.88)";
+    ctx.fillText("เร็ว", cx, top - 22);
+    ctx.fillText("ช้า", cx, bottom + 22);
+
+    ctx.save();
+    ctx.translate(left - 22, cy);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("งาน", 0, 0);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(right + 22, cy);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("คน", 0, 0);
+    ctx.restore();
+
+    ctx.font = '900 13px "Noto Sans Thai", system-ui, sans-serif';
+    ctx.fillStyle = "rgba(17, 24, 39, 0.92)";
+    ctx.fillText("🐂 D", left + size * 0.25, top + size * 0.16);
+    ctx.fillText("🦅 i", left + size * 0.75, top + size * 0.16);
+    ctx.fillText("🐭 S", left + size * 0.75, top + size * 0.84);
+    ctx.fillText("🧸 C", left + size * 0.25, top + size * 0.84);
+
+    // Points (per submission)
+    ctx.fillStyle = "rgba(37, 99, 235, 0.16)";
+    for (const r of rows) {
+      const { nx, ny } = normPoint(r.disc_score_d, r.disc_score_i, r.disc_score_s, r.disc_score_c);
+      const px = cx + (size / 2) * nx;
+      const py = cy - (size / 2) * ny;
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Average point (highlight)
+    if (rows.length) {
+      const sum = rows.reduce(
+        (acc, r) => {
+          acc.d += r.disc_score_d;
+          acc.i += r.disc_score_i;
+          acc.s += r.disc_score_s;
+          acc.c += r.disc_score_c;
+          return acc;
+        },
+        { d: 0, i: 0, s: 0, c: 0 },
+      );
+      const avg = { d: sum.d / rows.length, i: sum.i / rows.length, s: sum.s / rows.length, c: sum.c / rows.length };
+      const { nx, ny } = normPoint(avg.d, avg.i, avg.s, avg.c);
+      const px = cx + (size / 2) * nx;
+      const py = cy - (size / 2) * ny;
+
+      ctx.fillStyle = "rgba(37, 99, 235, 0.18)";
+      ctx.beginPath();
+      ctx.arc(px, py, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(37, 99, 235, 0.95)";
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '800 12px "Noto Sans Thai", system-ui, sans-serif';
+      ctx.fillStyle = "rgba(17, 24, 39, 0.75)";
+      ctx.fillText("ค่าเฉลี่ยของกลุ่ม", px, Math.max(top + 14, py - 20));
+    }
+  }
+
   /** @param {HTMLElement} mount */
   function renderLogin(mount) {
     mount.innerHTML = `
@@ -455,7 +589,7 @@
           <tr>
             <td class="mono">${escapeHtml(timeLabel(tz, r.submitted_at))}</td>
             <td>${escapeHtml(r.result_summary || "")}</td>
-            <td class="mono">D ${r.disc_score_d} / I ${r.disc_score_i} / S ${r.disc_score_s} / C ${r.disc_score_c}</td>
+            <td class="mono">D ${r.disc_score_d} / i ${r.disc_score_i} / S ${r.disc_score_s} / C ${r.disc_score_c}</td>
           </tr>
         `;
       })
@@ -477,6 +611,16 @@
         <div class="admin-block">
           <div class="admin-block-title">จำนวนผู้ได้แต่ละสไตล์</div>
           ${topHtml}
+        </div>
+
+        <div class="admin-block">
+          <div class="admin-block-title">แผนภาพควอดแรนต์ DiSC (ภาพรวมกลุ่ม)</div>
+          <div class="admin-quadrant-wrap">
+            <canvas id="admin-disc-quadrant" role="img" aria-label="ควอดแรนต์ DiSC (ภาพรวมกลุ่ม)"></canvas>
+          </div>
+          <div class="muted" style="margin-top: 0.35rem;">
+            จุดจาง = รายบุคคล • จุดเข้ม = ค่าเฉลี่ยของกลุ่ม
+          </div>
         </div>
 
         <div class="admin-block">
@@ -538,6 +682,11 @@
         }
       }
     };
+
+    const quad = /** @type {HTMLCanvasElement | null} */ (mount.querySelector("#admin-disc-quadrant"));
+    if (quad) {
+      requestAnimationFrame(() => renderAdminQuadrant(quad, rows));
+    }
   }
 
   /** @param {string} s */
