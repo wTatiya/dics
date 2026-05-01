@@ -234,6 +234,12 @@ thead {
   color: var(--muted);
 }
 
+.footer .footer-disclaimer {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
 @media (max-width: 640px) {
   .hero-actions {
     flex-direction: column;

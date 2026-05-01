@@ -307,8 +307,9 @@
    * @param {HTMLCanvasElement} canvas
    * @param {Record<DiscLetter, number>} scores
    * @param {number} maxScore
+   * @param {Record<DiscLetter, number> | null} groupAvgScores
    */
-  function renderDiscRadar(canvas, scores, maxScore) {
+  function renderDiscRadar(canvas, scores, maxScore, groupAvgScores) {
     const W = 360;
     const H = 400;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -373,23 +374,40 @@
     }
 
     // Data polygon
-    const fillPts = values.map((v, i) => {
-      const denom = maxScore || 1;
-      const t = Math.min(Math.max(v / denom, 0), 1);
-      return pointAt(angles[i], radius * t);
-    });
+    const denom = maxScore || 1;
 
-    ctx.beginPath();
-    fillPts.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.closePath();
-    ctx.fillStyle = "rgba(59, 130, 246, 0.22)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.85)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    function ptsFor(scoresLike) {
+      const vals = dims.map((d) => scoresLike[d.key]);
+      return vals.map((v, i) => {
+        const t = Math.min(Math.max(v / denom, 0), 1);
+        return pointAt(angles[i], radius * t);
+      });
+    }
+
+    function drawPoly(pts, fillStyle, strokeStyle, lineWidth) {
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.closePath();
+      if (fillStyle) {
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+      }
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+
+    // Group average first (behind), then individual on top.
+    if (groupAvgScores) {
+      const groupPts = ptsFor(groupAvgScores);
+      drawPoly(groupPts, "rgba(108, 214, 26, 0.12)", "rgba(108, 214, 26, 0.85)", 2);
+    }
+
+    const fillPts = ptsFor(scores);
+    drawPoly(fillPts, "rgba(59, 130, 246, 0.22)", "rgba(37, 99, 235, 0.85)", 2);
 
     // Vertices + scores
     ctx.font = '600 12px "Noto Sans Thai", system-ui, sans-serif';
@@ -477,7 +495,10 @@
       <div class="nbk-radar-card" aria-label="กราฟเรดาร์คะแนนมิติ DISC">
         <div class="nbk-radar-head">
           <h4 class="nbk-radar-title">โปรไฟล์ DISC</h4>
-          <p class="nbk-radar-caption">เปรียบเทียบ 4 มิติจากคำตอบที่มีอยู่ (สเกลข้อละ 1 คะแนน สูงสุด ${maxTotal} ต่อมิติ)</p>
+          <p class="nbk-radar-caption">
+            เปรียบเทียบ 4 มิติจากคำตอบที่มีอยู่ (สเกลข้อละ 1 คะแนน สูงสุด ${maxTotal} ต่อมิติ)
+            <span class="muted" id="nbk-radar-legend">• สีน้ำเงิน = คุณ</span>
+          </p>
         </div>
         <div class="nbk-radar-canvas-wrap">
           <canvas id="nbk-disc-radar" role="img" aria-label="เรดาร์ D I S C"></canvas>
@@ -486,7 +507,146 @@
     `;
 
     const radarCanvas = /** @type {HTMLCanvasElement | null} */ (resultsEl.querySelector("#nbk-disc-radar"));
-    if (radarCanvas) requestAnimationFrame(() => renderDiscRadar(radarCanvas, scores, maxTotal));
+    const legendEl = /** @type {HTMLElement | null} */ (resultsEl.querySelector("#nbk-radar-legend"));
+    if (radarCanvas) {
+      requestAnimationFrame(() => renderDiscRadar(radarCanvas, scores, maxTotal, null));
+      // Best-effort: fetch group average (if configured) and re-render with overlay.
+      fetchDiscGroupAverage()
+        .then((avg) => {
+          if (!avg) return;
+          if (legendEl) legendEl.textContent = "• สีน้ำเงิน = คุณ • สีเขียว = ค่าเฉลี่ยของกลุ่ม";
+          renderDiscRadar(radarCanvas, scores, maxTotal, avg);
+        })
+        .catch(() => {});
+    }
+  }
+
+  /** @returns {{ sheet: { spreadsheetId: string, sheetName: string } } | null} */
+  function getGroupCfg() {
+    const cfg = /** @type {any} */ (window.DISC_GROUP_CONFIG) || {};
+    const spreadsheetId = String(cfg.sheet?.spreadsheetId || "").trim();
+    const sheetName = String(cfg.sheet?.sheetName || "DiscSubmissions").trim();
+    if (!spreadsheetId) return null;
+    return { sheet: { spreadsheetId, sheetName } };
+  }
+
+  /** @param {unknown} v */
+  function toNum(v) {
+    const n = typeof v === "number" ? v : Number(String(v ?? "").trim());
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /** Minimal CSV parser supporting quotes/newlines. */
+  function parseCsv(text) {
+    /** @type {string[][]} */
+    const rows = [];
+    /** @type {string[]} */
+    let row = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
+
+      if (inQuotes) {
+        if (ch === '"' && next === '"') {
+          cur += '"';
+          i++;
+          continue;
+        }
+        if (ch === '"') {
+          inQuotes = false;
+          continue;
+        }
+        cur += ch;
+        continue;
+      }
+
+      if (ch === '"') {
+        inQuotes = true;
+        continue;
+      }
+
+      if (ch === ",") {
+        row.push(cur);
+        cur = "";
+        continue;
+      }
+
+      if (ch === "\n") {
+        row.push(cur);
+        cur = "";
+        rows.push(row);
+        row = [];
+        continue;
+      }
+
+      if (ch === "\r") continue;
+      cur += ch;
+    }
+
+    row.push(cur);
+    rows.push(row);
+    return rows;
+  }
+
+  /** @param {string} spreadsheetId @param {string} sheetName */
+  function sheetCsvUrl(spreadsheetId, sheetName) {
+    const base = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq`;
+    const params = new URLSearchParams({ tqx: "out:csv", sheet: sheetName });
+    return `${base}?${params.toString()}`;
+  }
+
+  /**
+   * Fetch group average DISC scores from Google Sheet (CSV).
+   * Returns null if not configured or fetch fails.
+   * @returns {Promise<Record<DiscLetter, number> | null>}
+   */
+  async function fetchDiscGroupAverage() {
+    const cfg = getGroupCfg();
+    if (!cfg) return null;
+    const url = sheetCsvUrl(cfg.sheet.spreadsheetId, cfg.sheet.sheetName);
+
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const text = await res.text();
+
+    const parsed = parseCsv(text);
+    const header = (parsed[0] || []).map((h) => String(h || "").trim());
+    const idx = Object.create(null);
+    for (let i = 0; i < header.length; i++) idx[header[i]] = i;
+    const getCell = (cells, k) => cells[idx[k] ?? -1] ?? "";
+
+    let n = 0;
+    let sumD = 0;
+    let sumi = 0;
+    let sumS = 0;
+    let sumC = 0;
+
+    for (let r = 1; r < parsed.length; r++) {
+      const cells = parsed[r];
+      if (!cells || cells.every((c) => !String(c || "").trim())) continue;
+      const d = toNum(getCell(cells, "disc_score_d"));
+      const i = toNum(getCell(cells, "disc_score_i"));
+      const s = toNum(getCell(cells, "disc_score_s"));
+      const c = toNum(getCell(cells, "disc_score_c"));
+      // Skip empty rows that parse as all-zeros.
+      if (!(d || i || s || c)) continue;
+      n++;
+      sumD += d;
+      sumi += i;
+      sumS += s;
+      sumC += c;
+    }
+
+    if (!n) return null;
+    return {
+      D: sumD / n,
+      i: sumi / n,
+      S: sumS / n,
+      C: sumC / n,
+    };
   }
 
   /**

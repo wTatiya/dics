@@ -424,12 +424,12 @@
       const px = cx + (size / 2) * nx;
       const py = cy - (size / 2) * ny;
 
-      ctx.fillStyle = "rgba(37, 99, 235, 0.18)";
+      ctx.fillStyle = "rgba(108, 214, 26, 0.22)";
       ctx.beginPath();
       ctx.arc(px, py, 12, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "rgba(37, 99, 235, 0.95)";
+      ctx.fillStyle = "#6CD61A";
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
       ctx.fill();
