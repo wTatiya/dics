@@ -788,11 +788,53 @@ thead {
   background: linear-gradient(180deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
   color: #ffffff;
   box-shadow: 0 8px 20px rgba(22, 163, 74, 0.32);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 7.5rem;
+  position: relative;
 }
 
-.disc-quiz .nbk-btn-send:hover {
+.disc-quiz .nbk-btn-send:hover:not(:disabled) {
   background: linear-gradient(180deg, rgba(34, 197, 94, 1), rgba(21, 128, 61, 1));
   box-shadow: 0 10px 24px rgba(22, 163, 74, 0.38);
+}
+
+.disc-quiz .nbk-btn-send:disabled {
+  cursor: wait;
+  opacity: 0.95;
+}
+
+.disc-quiz .nbk-btn-send .nbk-btn-send-progress {
+  display: none;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 800;
+}
+
+.disc-quiz .nbk-btn-send.is-loading .nbk-btn-send-text {
+  display: none;
+}
+
+.disc-quiz .nbk-btn-send.is-loading .nbk-btn-send-progress {
+  display: inline-flex;
+}
+
+.disc-quiz .nbk-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: nbk-spin 0.65s linear infinite;
+}
+
+@keyframes nbk-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .disc-quiz .nbk-btn-ghost {

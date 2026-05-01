@@ -536,6 +536,8 @@
 
     const sheet = document.createElement("div");
     sheet.className = "nbk-sheet";
+    /** Stops double-clicks from enqueueing multiple sheet submissions while the webhook is in flight. */
+    let sendInProgress = false;
     sheet.innerHTML = `
       <div class="nbk-paper">
         <header class="nbk-header">
@@ -552,7 +554,13 @@
           <form class="nbk-form" autocomplete="off">
             <div class="nbk-grid" id="nbk-grid"></div>
             <div class="nbk-bottom-actions" aria-label="การดำเนินการแบบสอบถาม">
-              <button type="button" class="nbk-btn nbk-btn-send" data-action="send">ส่งผล</button>
+              <button type="button" class="nbk-btn nbk-btn-send" data-action="send" aria-busy="false">
+                <span class="nbk-btn-send-text">ส่งผล</span>
+                <span class="nbk-btn-send-progress" aria-hidden="true">
+                  <span class="nbk-spinner"></span>
+                  <span>กำลังส่ง…</span>
+                </span>
+              </button>
               <button type="button" class="nbk-btn nbk-btn-ghost" data-action="reset">ล้างคำตอบ</button>
             </div>
           </form>
@@ -661,6 +669,7 @@
 
       const action = btn.getAttribute("data-action");
       if (action === "reset") {
+        if (sendInProgress) return;
         for (let q = 1; q <= items.length; q++) delete answers[`q${q}`];
         clearAnswers();
         // Clear UI checks
@@ -671,40 +680,59 @@
       }
 
       if (action === "send") {
-        const scores = calcScores();
-        const choiceCounts = calcChoiceCounts(answers, items.length);
-        const { top: topDisc } = topStyles(scores);
-        const topProfiles = topDisc.map((d) => profileForDisc(d));
-        const resultSummary =
-          topDisc.length === 1
-            ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
-            : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
+        if (sendInProgress) return;
+        sendInProgress = true;
 
-        const cfg = window.DISC_OWNER_SUBMISSION_CONFIG;
-        const submitFn = window.submitDiscSubmissionToOwner;
-        if (cfg && cfg.enabled && typeof submitFn === "function") {
-          /** @type {Record<string, unknown>} */
-          const row = {
-            submitted_at: new Date().toISOString(),
-            result_summary: resultSummary,
-            disc_score_d: scores.D,
-            disc_score_i: scores.i,
-            disc_score_s: scores.S,
-            disc_score_c: scores.C,
-            raw_choice_a: choiceCounts.A,
-            raw_choice_b: choiceCounts.B,
-            raw_choice_c: choiceCounts.C,
-            raw_choice_d: choiceCounts.D,
-            answers: { ...answers },
-          };
-          const sent = await submitFn(row);
-          if (sent.ok) {
-            flashStatus(sheet, "ส่งผลให้ผู้ดูแลระบบแล้ว");
-          } else if (sent.error !== "not_configured") {
-            flashStatus(sheet, "ส่งผลไม่สำเร็จ โปรดลองอีกครั้ง");
+        const sendBtn = /** @type {HTMLButtonElement} */ (btn);
+        const formEl = sheet.querySelector(".nbk-form");
+        const setSendingUi = (on) => {
+          sendBtn.disabled = on;
+          sendBtn.classList.toggle("is-loading", on);
+          sendBtn.setAttribute("aria-busy", on ? "true" : "false");
+          if (formEl instanceof HTMLElement) formEl.inert = on;
+        };
+        setSendingUi(true);
+
+        try {
+          const scores = calcScores();
+          const choiceCounts = calcChoiceCounts(answers, items.length);
+          const { top: topDisc } = topStyles(scores);
+          const topProfiles = topDisc.map((d) => profileForDisc(d));
+          const resultSummary =
+            topDisc.length === 1
+              ? `${topProfiles[0].emoji} ${topProfiles[0].title}`
+              : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
+
+          const cfg = window.DISC_OWNER_SUBMISSION_CONFIG;
+          const submitFn = window.submitDiscSubmissionToOwner;
+          if (cfg && cfg.enabled && typeof submitFn === "function") {
+            /** @type {Record<string, unknown>} */
+            const row = {
+              submitted_at: new Date().toISOString(),
+              result_summary: resultSummary,
+              disc_score_d: scores.D,
+              disc_score_i: scores.i,
+              disc_score_s: scores.S,
+              disc_score_c: scores.C,
+              raw_choice_a: choiceCounts.A,
+              raw_choice_b: choiceCounts.B,
+              raw_choice_c: choiceCounts.C,
+              raw_choice_d: choiceCounts.D,
+              answers: { ...answers },
+            };
+            const sent = await submitFn(row);
+            if (sent.ok) {
+              flashStatus(sheet, "ส่งผลให้ผู้ดูแลระบบแล้ว");
+            } else if (sent.error !== "not_configured") {
+              flashStatus(sheet, "ส่งผลไม่สำเร็จ โปรดลองอีกครั้ง");
+            }
           }
+          window.location.href = "result.html";
+        } catch {
+          sendInProgress = false;
+          setSendingUi(false);
+          flashStatus(sheet, "เกิดข้อผิดพลาด โปรดลองอีกครั้ง");
         }
-        window.location.href = "result.html";
       }
     });
 
