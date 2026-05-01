@@ -454,6 +454,9 @@
       : `ผลเสมอ: ${topDisc.map((d, i) => `${topProfiles[i].emoji} ${formatDiscLabel(d)}`).join(" / ")}`;
     const topSubtitle = topDisc.length === 1 ? topProfiles[0].subtitle : "";
 
+    const top2Profiles = top2.map((d) => profileForDisc(d));
+    const top2Label = `${top2Profiles[0].emoji} ${formatDiscLabel(top2[0])} + ${top2Profiles[1].emoji} ${formatDiscLabel(top2[1])}`;
+
     const pairKey = `${top2[0]}/${top2[1]}`;
     const pairHtml = pairBlurbs[pairKey];
 
@@ -465,6 +468,22 @@
           <h4>สรุปผล</h4>
           <div class="nbk-status ${complete ? "is-complete" : ""}">
             ${complete ? "ครบแล้ว" : `ตอบให้ครบ ${maxTotal} ข้อ`}
+          </div>
+        </div>
+
+        <div class="nbk-top-cards" aria-label="สรุปผลแบบการ์ด">
+          <div class="nbk-gradient-card" role="group" aria-label="ผลของท่านคือ">
+            <div class="nbk-gradient-card-inner">
+              <div class="nbk-top-label">ผลของท่านคือ</div>
+              <div class="nbk-top-value">${topLabel}</div>
+            </div>
+          </div>
+          <div class="nbk-gradient-card" role="group" aria-label="คู่สไตล์ของท่านคือ">
+            <div class="nbk-gradient-card-inner">
+              <div class="nbk-top-label">คู่สไตล์ของท่านคือ</div>
+              <div class="nbk-top-value">${top2Label}</div>
+              <div class="nbk-top-sub">${pairHtml ? pairHtml : `<strong>${pairKey}:</strong> ${formatDiscLabel(top2[0])} / ${formatDiscLabel(top2[1])}`}</div>
+            </div>
           </div>
         </div>
 
