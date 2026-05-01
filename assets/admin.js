@@ -453,6 +453,7 @@
           </label>
           <div class="admin-actions">
             <button class="button" type="submit">เข้าสู่ระบบ</button>
+            <a class="button button-outline" href="index.html">กลับไปหน้าแบบสอบถาม</a>
           </div>
           <div class="admin-error" aria-live="polite"></div>
         </form>
