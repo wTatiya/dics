@@ -433,6 +433,10 @@
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
       ctx.fill();
+      // Make the average point stand out with an outline.
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
       ctx.font = '800 12px "Noto Sans Thai", system-ui, sans-serif';
       ctx.fillStyle = "rgba(17, 24, 39, 0.75)";
@@ -573,35 +577,29 @@
       .slice()
       .sort((a, b) => (a.submitted_at < b.submitted_at ? 1 : -1));
 
-    /** @type {Record<string, { count: number, examples: string[] }>} */
+    /** @type {Record<string, { count: number }>} */
     const pairRank = {};
     for (const r of sorted) {
       const p = top2Pair(r);
       const key = p.label || "เสมอ";
-      (pairRank[key] ||= { count: 0, examples: [] }).count += 1;
-      const ex = `${timeLabel(tz, r.submitted_at)} — ${p.label}`;
-      if (pairRank[key].examples.length < 3) pairRank[key].examples.push(ex);
+      (pairRank[key] ||= { count: 0 }).count += 1;
     }
 
     const pairRankEntries = Object.entries(pairRank)
-      .map(([k, v]) => [k, v.count, v.examples] )
+      .map(([k, v]) => [k, v.count] )
       .sort((a, b) => /** @type {any} */ (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
 
     const pairHtml = pairRankEntries.length
       ? `
         <ol class="admin-pair-rank">
           ${pairRankEntries
-            .map(([label, count, examples]) => {
-              const exHtml = (examples || [])
-                .map((s) => `<li class="mono muted">${escapeHtml(String(s))}</li>`)
-                .join("");
+            .map(([label, count]) => {
               return `
                 <li class="admin-pair-item">
                   <div class="admin-pair-head">
                     <div class="admin-pair-label mono">${escapeHtml(String(label))}</div>
                     <div class="admin-pair-count">${count}</div>
                   </div>
-                  ${exHtml ? `<ul class="admin-pair-examples">${exHtml}</ul>` : ""}
                 </li>
               `;
             })
@@ -647,7 +645,7 @@
             <canvas id="admin-disc-quadrant" role="img" aria-label="ควอดแรนต์ DiSC (ภาพรวมกลุ่ม)"></canvas>
           </div>
           <div class="muted" style="margin-top: 0.35rem;">
-            จุดจาง = รายบุคคล • จุดเข้ม = ค่าเฉลี่ยของกลุ่ม • อัปเดตอัตโนมัติทุก ${(LIVE_REFRESH_MS / 1000).toFixed(0)} วินาที
+            จุดน้ำเงินจาง = รายบุคคล • จุดสีเขียว = ค่าเฉลี่ยของกลุ่ม • อัปเดตอัตโนมัติทุก ${(LIVE_REFRESH_MS / 1000).toFixed(0)} วินาที
           </div>
         </div>
 
